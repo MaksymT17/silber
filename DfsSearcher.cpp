@@ -1,9 +1,10 @@
 #include"DfsSearcher.h"
 
-namespace {
+namespace silber {
 
 	// 0 - empty cell, otherwise acceptable value for algorithm
-	void dfs(SearchInfo& info, const Matrix<uint8_t>& data, Position position, size_t distance = 0) {
+	void dfs(silber::SearchInfo& info, const silber::Matrix<uint8_t>& data, silber::Position position, size_t distance = 0) {
+		using namespace silber;
 		Matrix<uint8_t> newData(data);
 		newData(position.x, position.y) = 0;
 
@@ -14,21 +15,23 @@ namespace {
 			info.distance = distance;
 		}
 
-		if (position.y + 1 < newData.getHeight() && newData(position.x, position.y + 1))
-			dfs(info, newData, { position.x, uint16_t(position.y + SHIFT) }, distance + 1);
+		if (position.y + 1 < newData.getHeight() && newData(position.x, position.y + SHIFT))
+			dfs(info, newData, { position.x, position.y + SHIFT }, distance + SHIFT);
 
-		if (position.y > 0 && newData(position.x, position.y - 1))
-			dfs(info, newData, { position.x, uint16_t(position.y - SHIFT) }, distance + 1);
+		if (position.y > 0 && newData(position.x, position.y - SHIFT))
+			dfs(info, newData, { position.x, position.y - SHIFT }, distance + SHIFT);
 
-		if (position.x + 1 < newData.getWidth() && newData(position.x + 1, position.y))
-			dfs(info, newData, { uint16_t(position.x + SHIFT), position.y }, distance + 1);
+		if (position.x + 1 < newData.getWidth() && newData(position.x + SHIFT, position.y))
+			dfs(info, newData, { position.x + SHIFT, position.y }, distance + SHIFT);
 
-		if (position.x > 0 && newData(position.x - 1, position.y))
-			dfs(info, newData, { uint16_t(position.x - SHIFT), position.y }, distance + 1);
+		if (position.x > 0 && newData(position.x - SHIFT, position.y))
+			dfs(info, newData, { position.x - SHIFT, position.y }, distance + SHIFT);
 
 	}
 }
 
-void DfsSearcher::search(SearchInfo& info, const Matrix<uint8_t>& data) {
-	dfs(info, data, { info.start });
+namespace silber {
+	void DfsSearcher::search(SearchInfo& info, const Matrix<uint8_t>& data) {
+		dfs(info, data, { info.start });
+	}
 }

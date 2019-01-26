@@ -12,6 +12,7 @@
 
 int main()
 {
+	using namespace silber;
 	Matrix<uint8_t> data(5, 5);
 	data(0, 0) = 0; data(1, 0) = 0; data(2, 0) = 0; data(3, 0) = 1; data(4, 0) = 1;
 	data(0, 1) = 0; data(1, 1) = 1; data(2, 1) = 0; data(3, 1) = 1; data(4, 1) = 1;
@@ -26,12 +27,9 @@ int main()
 
 	SearchInfo infoBfs(info);
 
-	//dfs(info, data, 1, 1);
-	//Positions poss{ {1,1} };
-	//Positions empty;
-	//bfs(infoBfs, data, empty, poss);
 	DfsSearcher sd;
 	sd.search(info, data);
+
 	BfsSearcher sr;
 	sr.search(infoBfs, data);
 	return 0;

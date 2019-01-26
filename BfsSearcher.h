@@ -2,8 +2,10 @@
 
 #include"ISearcher.hpp"
 
-class BfsSearcher : public ISearcher {
-public:
-	BfsSearcher() = default;
-	virtual void search(SearchInfo& info, const Matrix<uint8_t>& data) override;
-};
+namespace silber {
+	class BfsSearcher : public ISearcher {
+	public:
+		BfsSearcher() = default;
+		virtual void search(SearchInfo& info, const Matrix<uint8_t>& data) override;
+	};
+}
