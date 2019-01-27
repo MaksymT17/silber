@@ -8,6 +8,6 @@ namespace silber {
 	public:
 		virtual ~ISearcher() = default;
 
-		virtual void search(SearchInfo& info, const Matrix<uint8_t>& data) = 0;
+		virtual void search(SearchInfo& info, const Matrix<uint16_t>& data) = 0;
 	};
 }

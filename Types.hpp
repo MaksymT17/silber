@@ -1,16 +1,18 @@
 #pragma once
+
 #include <new>
 #include <vector>
+#include <iostream>
 
 namespace silber {
 
-	const unsigned SHIFT = 1u;
-
+	const uint16_t SHIFT = 1u;
+	
 	template<class T>
 	class Matrix
 	{
 	public:
-		Matrix(size_t width, size_t height)
+		Matrix(uint16_t width, uint16_t height)
 			: mWidth(width),
 			mHeight(height) {
 			// throw project defined bad alloc exception
@@ -18,30 +20,30 @@ namespace silber {
 				mData = std::vector<T>(width * height);
 			}
 			catch (const std::bad_alloc& e) {
-				printf("bad_alloc\n");
+				printf("bad_alloc [%s]\n", e.what());
 			}
 			catch (const std::length_error& e) {
-				printf("std::length_error\n");
+				printf("std::length_error[%s]\n", e.what());
 			}
 			catch (...) {
 				printf("Allocation failed. Reason: unknown.\n");
 			}
 		}
 
-		size_t getWidth()const { return mWidth; }
-		size_t getHeight()const { return mHeight; }
+		uint16_t getWidth()const { return mWidth; }
+		uint16_t getHeight()const { return mHeight; }
 
-		T& operator()(size_t x, size_t y) {
+		T& operator()(uint16_t x, uint16_t y) {
 			return mData[y * mWidth + x];
 		}
 
-		T operator()(size_t x, size_t y) const {
+		T operator()(uint16_t x, uint16_t y) const {
 			return mData[y * mWidth + x];
 		}
 
 	private:
-		size_t mWidth;
-		size_t mHeight;
+		uint16_t mWidth;
+		uint16_t mHeight;
 		std::vector<T> mData;
 	};
 
@@ -54,11 +56,11 @@ namespace silber {
 	struct SearchInfo {
 		Position start;
 		Position search;
-		size_t distance;
+		uint16_t distance;
 	};
 
 	struct SearchingData {
 		SearchInfo& info;
-		const Matrix<uint8_t>& data;
+		const Matrix<uint16_t>& data;
 	};
 }
