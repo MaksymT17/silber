@@ -29,7 +29,7 @@ namespace silber {
 				collected.push_back(position);
 
 				if (position.y - SHIFT >= 0 && data(position.x, position.y - SHIFT))
-					pushCheckIfNew(collected, nextCheck, { position.x, static_cast<uint16_t>(position.y - SHIFT) });
+					pushCheckIfNew(collected, nextCheck, { position.x, static_cast<uint16_t>(position.y - SHIFT)});
 				if (position.y + SHIFT < data.getHeight() && data(position.x, static_cast<uint16_t>(position.y + SHIFT)))
 					pushCheckIfNew(collected, nextCheck, { position.x, static_cast<uint16_t>(position.y + SHIFT) });
 				if (position.x - SHIFT >= 0 && data(static_cast<uint16_t>(position.x - SHIFT), position.y))

@@ -2,7 +2,6 @@
 #include"Types.hpp"
 #include"BfsSearcher.h"
 #include"DfsSearcher.h"
-#include"BinarySearcher.h"
 
 // 0 0 0 1 1
 // 1[1]0 1 1
@@ -13,9 +12,6 @@
 int main()
 {
 	using namespace silber;
-	std::vector<int> array{ 1,5,2,3,9,23,4,7,10 };
-	std::vector<size_t> array1{ 1,5,2,3,9,23,4,7,10 };
-	bool equal = BinarySearcher::binarySearch(array, 7, false) == BinarySearcher::binarySearch(array1, 7, false);
 
 	
 	Matrix<uint16_t> data(5, 5);
