@@ -130,42 +130,34 @@ ProcCommunicator::~ProcCommunicator()
 
 void ProcCommunicator::send(const Message *msg)
 {
-    if (m_master_mode)
-        sem_wait(m_slave_ready);
+    if (!m_master_mode)
+    {
+        if (m_master_mode)
+            sem_wait(m_slave_ready);
 
-    m_sender->sendMessage(msg);
-    sem_post(m_master_mode ? m_master_sent : m_slave_sent);
-    sem_wait(m_master_mode ? m_slave_received : m_master_received);
+        m_sender->sendMessage(msg);
+        sem_post(m_master_mode ? m_master_sent : m_slave_sent);
+        sem_wait(m_master_mode ? m_slave_received : m_master_received);
+    }
+    else
+    {
+        std::cerr << "ProcCommunicator::send  send & receive calls expected only from server\n";
+    }
 }
 
 Message *ProcCommunicator::receive()
 {
-    sem_wait(m_master_mode ? m_slave_sent : m_master_sent);
-    Message *response = m_receiver->receiveMessage();
-    sem_post(m_master_mode ? m_master_received : m_slave_received);
-
-    return response;
-}
-
-void ProcCommunicator::sendRequestGetResponse(const Message *request, Message &reponse)
-{
-    if (m_master_mode)
+    if (!m_master_mode)
     {
-//send
-        sem_wait(m_slave_ready);
-        m_sender->sendMessage(request);
-        sem_post(m_master_mode ? m_master_sent : m_slave_sent);
-        sem_wait(m_master_mode ? m_slave_received : m_master_received);
-//receive
         sem_wait(m_master_mode ? m_slave_sent : m_master_sent);
-        reponse = *m_receiver->receiveMessage();
+        Message *response = m_receiver->receiveMessage();
         sem_post(m_master_mode ? m_master_received : m_slave_received);
-//ack
-        sem_post(m_slave_ready);
+
+        return response;
     }
     else
     {
-        std::cerr << "ProcCommunicator::sendRequestGetResponse allowed only from clients\n";
+        std::cerr << "ProcCommunicator::receive  send & receive calls expected only from server\n";
     }
 }
 
