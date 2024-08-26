@@ -4,24 +4,24 @@
 #include <chrono>
 #include <mutex>
 
-static const std::string shared_mem_name{"/shmsh1"};
-static constexpr size_t MSG_COUNT = 1000;
+static const std::string shared_mem_name{"/shmsh15"};
+static constexpr size_t MSG_COUNT = 10000;
 
 void backgroundTask1()
 {
     std::cout << "Background Master_1 starting...\n";
     ProcCommunicator master(true, true, shared_mem_name);
-    Message msg_hand{1, MessageType::HANDSHAKE};
+    Message request{1, MessageType::HANDSHAKE};
+    Message response{1, MessageType::HANDSHAKE};
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        master.send(&msg_hand);
-        auto msg_resp = master.receive();
+        master.sendRequestGetResponse(&request, response);
         
-        //std::cout << "m 1 =" << msg_resp->id << std::endl;
-        master.ackNotify();
+        std::cout << "m 1 =" << response.id << std::endl;
+        //master.ackNotify();
         counter++;
     }
 
@@ -39,7 +39,7 @@ void backgroundTask2()
     {
         master.send(&msg_hand);
         auto msg_resp = master.receive();
-        std::cout << "m 2 " << msg_resp->id << std::endl;
+        //std::cout << "m 2 " << msg_resp->id << std::endl;
         master.ackNotify();
         counter++;
     }

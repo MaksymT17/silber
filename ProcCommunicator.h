@@ -17,7 +17,7 @@ public:
 
     void send(const Message *msg);
     Message *receive();
-    Message *sendAndGetResponse(const Message *msg);
+    void sendRequestGetResponse(const Message *request, Message &reponse);
     void ackNotify();
 
 private:
