@@ -27,8 +27,6 @@ void backgroundTask1()
 }
 
 
-
-
 void backgroundTask2()
 {
     std::cout << "Background Master_2 starting...\n";

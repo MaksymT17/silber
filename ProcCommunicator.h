@@ -20,8 +20,6 @@ public:
 
     void send(const Message *msg);
     Message *receive();
-    //void sendRequestGetResponse(const Message *request, Message &reponse);
-    void ackNotify();
 
     template <typename Response>
     void sendRequestGetResponse(const Message *request, Response &reponse)
@@ -38,7 +36,7 @@ public:
             Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
 
             if (repsonsePtr)
-                reponse = *repsonsePtr;
+                reponse = Response(*repsonsePtr);
             else
                 std::cerr << "ProcCommunicator::sendRequestGetResponse response type is not expected\n";
 

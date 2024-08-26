@@ -161,16 +161,6 @@ Message *ProcCommunicator::receive()
     }
 }
 
-void ProcCommunicator::ackNotify()
-{
-    if (m_master_mode)
-        sem_post(m_slave_ready);
-    else
-    {
-        std::cerr << "ProcCommunicator::ackNotify must be sent only from master, when response processed.\n";
-    }
-}
-
 #else
 void ProcCommunicator::send(const Message *msg)
 {
@@ -205,16 +195,6 @@ Message *ProcCommunicator::receive()
     }
     return response;
 }
-void ProcCommunicator::ackNotify()
-{
-    if (m_master_mode)
-    {
-        ReleaseSemaphore(m_slave_ready, 1, NULL);
-    }
-    else
-    {
-        std::cerr << "ProcCommunicator::ackNotify must be sent only from master, when response processed.\n";
-    }
-}
+
 #endif
 
