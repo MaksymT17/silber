@@ -11,50 +11,28 @@
 #include <windows.h>
 #endif
 
+constexpr int SEMAPHORE_DISABLED = 0;
+constexpr int SEMAPHORE_ENABLED = 1;
 
 class ProcCommunicator
 {
-public:
-    ProcCommunicator(const bool isMasterMode, const bool isMultipleMasters, const std::string &shMemName);
+protected:
+    ProcCommunicator(const std::string &shMemName);
     ~ProcCommunicator();
 
-    void send(const Message *msg);
-    Message *receive();
-
-    template <typename Response>
-    void sendRequestGetResponse(const Message *request, Response &reponse)
-    {
-        if (m_master_mode)
-        {
-            // send
-            sem_wait(m_slave_ready);
-            m_sender->sendMessage(request);
-            sem_post(m_master_mode ? m_master_sent : m_slave_sent);
-            sem_wait(m_master_mode ? m_slave_received : m_master_received);
-            // receive
-            sem_wait(m_master_mode ? m_slave_sent : m_master_sent);
-            Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
-
-            if (repsonsePtr)
-                reponse = Response(*repsonsePtr);
-            else
-                std::cerr << "ProcCommunicator::sendRequestGetResponse response type is not expected\n";
-
-            sem_post(m_master_mode ? m_master_received : m_slave_received);
-            // release slave for next messages
-            sem_post(m_slave_ready);
-        }
-        else
-        {
-            std::cerr << "ProcCommunicator::sendRequestGetResponse allowed only from clients\n";
-        }
-    }
-
-private:
+protected:
     std::unique_ptr<SharedMemorySender> m_sender;
     std::unique_ptr<SharedMemoryReceiver> m_receiver;
-    bool m_master_mode;
-    
+
+    std::string m_master_received_s;
+    std::string m_slave_received_s;
+    std::string m_master_sent_s;
+    std::string m_slave_sent_s;
+    std::string m_slave_ready_s;
+
+    const std::string m_master_mem_name;
+    const std::string m_slave_mem_name;
+
 #ifndef _WIN32
     sem_t *m_master_received;
     sem_t *m_slave_received;
