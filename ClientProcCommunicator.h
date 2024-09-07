@@ -32,15 +32,15 @@ public:
     template <typename Response>
     void sendRequestGetResponse(const Message *request, Response &reponse)
     {
-WaitForSingleObject(m_slave_ready, INFINITE);
+        WaitForSingleObject(m_slave_ready, INFINITE);
         // sem_wait(m_slave_ready);
 
         m_sender->sendMessage(request);
         ReleaseSemaphore(m_master_sent, 1, NULL);
         // sem_post(m_master_sent);
-WaitForSingleObject(m_slave_received, INFINITE);
+        WaitForSingleObject(m_slave_received, INFINITE);
         // sem_wait(m_slave_received);
-WaitForSingleObject(m_slave_sent, INFINITE);
+        WaitForSingleObject(m_slave_sent, INFINITE);
         // sem_wait(m_slave_sent);
 
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
@@ -50,10 +50,10 @@ WaitForSingleObject(m_slave_sent, INFINITE);
         else
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
-ReleaseSemaphore(m_master_received, 1, NULL);
-        //sem_post(m_master_received);
+        ReleaseSemaphore(m_master_received, 1, NULL);
+        // sem_post(m_master_received);
         ReleaseSemaphore(m_slave_ready, 1, NULL);
-        //sem_post(m_slave_ready); // release slave for next messages
+        // sem_post(m_slave_ready); // release slave for next messages
     }
 #endif
 };
