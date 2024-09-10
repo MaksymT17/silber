@@ -1,0 +1,17 @@
+{
+    "name": "Windows GTest Dev Container",
+    "dockerFile": "Dockerfile",
+    "context": ".",
+    "settings": {
+        "terminal.integrated.shell.windows": "C:\\Windows\\System32\\cmd.exe",
+        "cmake.configureOnOpen": true,
+        "cmake.buildDirectory": "${workspaceFolder}/build"
+    },
+    "extensions": [
+        "ms-vscode.cmake-tools",
+        "ms-vscode.cpptools",
+        "ms-vscode.makefile-tools"
+    ],
+    "postCreateCommand": "mkdir -p /workspace/build && cd /workspace/build && cmake ..",
+    "workspaceFolder": "/workspace"
+}
