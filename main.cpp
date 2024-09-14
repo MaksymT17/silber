@@ -5,7 +5,9 @@
 #include <thread>
 #include <chrono>
 #include <mutex>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 #include <future>
 
 static const std::string shared_mem_name{"/shmsh__47"};

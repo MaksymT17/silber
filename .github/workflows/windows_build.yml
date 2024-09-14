@@ -24,6 +24,6 @@ jobs:
           echo "preparing new build with cmake..." &&
           cd build/ &&
           cmake .. &&
-          cmake --build . &&
-          echo "Build complete!"
+          cmake --build . --config Debug
+          cd Debug
         shell: bash
