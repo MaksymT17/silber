@@ -38,7 +38,6 @@ ServerProcCommunicator::ServerProcCommunicator(
     }
 
 #endif
-
 }
 ServerProcCommunicator::~ServerProcCommunicator()
 {
@@ -90,11 +89,8 @@ Message *ServerProcCommunicator::receive()
 #else
 void ServerProcCommunicator::send(const Message *msg)
 {
-    // Send the message
     m_sender->sendMessage(msg);
-    // Post (release) the semaphore
     ReleaseSemaphore(m_slave_sent, 1, NULL);
-    // Wait for the semaphore to be signaled
     WaitForSingleObject(m_master_received, INFINITE);
 }
 

@@ -3,7 +3,7 @@
 ClientProcCommunicator::ClientProcCommunicator(
     const std::string &shMemName) : ProcCommunicator(shMemName)
 {
-    m_sender = std::make_unique<SharedMemorySender>( m_master_mem_name.c_str());
+    m_sender = std::make_unique<SharedMemorySender>(m_master_mem_name.c_str());
     m_receiver = std::make_unique<SharedMemoryReceiver>(m_slave_mem_name.c_str());
 
 #ifndef _WIN32

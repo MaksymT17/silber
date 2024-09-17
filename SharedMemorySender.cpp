@@ -72,34 +72,24 @@ void SharedMemorySender::finish()
         std::cerr << "shm_unlink failed" << std::endl;
     }
 }
+
 void SharedMemorySender::sendMessage(const Message *msg)
 {
-    //    std::cout<<"sendMessage\n";
-
-        std::memcpy(m_ptr, msg, msg->size);
+    std::memcpy(m_ptr, msg, msg->size);
 }
+
 #else
 void SharedMemorySender::init()
 {
     std::wstring wshMemName(m_name.begin(), m_name.end());
-    m_shm_fd = CreateFileMappingW(
-        INVALID_HANDLE_VALUE, // use paging file
-        NULL,                 // default security
-        PAGE_READWRITE,       // read/write access
-        0,                    // maximum object size (high-order DWORD)
-        SHARED_MEMORY_SIZE,   // maximum object size (low-order DWORD)
-        wshMemName.c_str());  // name of mapping object
+    m_shm_fd = CreateFileMappingW(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, SHARED_MEMORY_SIZE, wshMemName.c_str());
 
     if (m_shm_fd == NULL)
     {
         printf("Could not create file mapping object (%d).\n",
                GetLastError());
     }
-    m_ptr = (void *)MapViewOfFile(m_shm_fd,            // handle to map object
-                                  FILE_MAP_ALL_ACCESS, // read/write permission
-                                  0,
-                                  0,
-                                  SHARED_MEMORY_SIZE);
+    m_ptr = (void *)MapViewOfFile(m_shm_fd, FILE_MAP_ALL_ACCESS, 0, 0, SHARED_MEMORY_SIZE);
 
     if (m_ptr == NULL)
     {

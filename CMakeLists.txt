@@ -13,5 +13,8 @@ ADD_LIBRARY(silber-1.0 STATIC
     ClientProcCommunicator.cpp
     ServerProcCommunicator.cpp)
 
+install(TARGETS silber-1.0 DESTINATION lib)
+install(FILES Message.hpp DESTINATION include )
+
 add_executable(silber_test main.cpp)
 target_link_libraries(silber_test silber-1.0)

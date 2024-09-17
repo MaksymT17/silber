@@ -59,7 +59,6 @@ void SharedMemoryReceiver::init()
 }
 void SharedMemoryReceiver::finish()
 {
-    // Unmap and close the shared memory object
     if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
     {
         std::cerr << "munmap failed" << std::endl;

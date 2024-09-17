@@ -42,8 +42,6 @@ ProcCommunicator::~ProcCommunicator()
         perror("Failed to destroy m_slave_ready semaphore");
     }
 
-   
-
 #else
     if (m_master_received && !CloseHandle(m_master_received))
     {
