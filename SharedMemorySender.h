@@ -16,7 +16,7 @@ public:
     SharedMemorySender(const char *shMemName);
     void init();
     void finish();
-    void sendMessage(const Message *msg);
+    void sendMessage(const Message *msg, const size_t offset=0);
 
 private:
 #ifndef _WIN32

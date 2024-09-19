@@ -13,8 +13,6 @@
 #include "SharedMemoryReceiver.h"
 #include <vector>
 
-const int SHARED_MEMORY_SIZE = 4096; // 4KB
-
 SharedMemoryReceiver::SharedMemoryReceiver(const char *shMemName) : m_name(shMemName)
 {
     init();
@@ -118,8 +116,8 @@ void SharedMemoryReceiver::finish()
 }
 #endif
 
-Message *SharedMemoryReceiver::receiveMessage()
+Message *SharedMemoryReceiver::receiveMessage(const size_t offset)
 {
-    Message *message(static_cast<Message *>(m_ptr));
+    Message *message(static_cast<Message *>( (void*)(static_cast<char*>(m_ptr) + offset)) );
     return message;
 }

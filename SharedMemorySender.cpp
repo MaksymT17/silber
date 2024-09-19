@@ -11,7 +11,6 @@
 #include <exception>
 #include "SharedMemorySender.h"
 
-const int SHARED_MEMORY_SIZE = 4096; // 4KB
 
 SharedMemorySender::SharedMemorySender(const char *shMemName) : m_name(shMemName)
 {
@@ -73,9 +72,9 @@ void SharedMemorySender::finish()
     }
 }
 
-void SharedMemorySender::sendMessage(const Message *msg)
+void SharedMemorySender::sendMessage(const Message *msg, const size_t offset)
 {
-    std::memcpy(m_ptr, msg, msg->size);
+    std::memcpy(static_cast<char*>(m_ptr)+offset, msg, msg->size);
 }
 
 #else

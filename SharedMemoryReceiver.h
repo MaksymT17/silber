@@ -9,7 +9,7 @@ public:
     SharedMemoryReceiver(const char *shMemName);
     void init();
     void finish();
-    Message *receiveMessage();
+    Message *receiveMessage(const size_t offset = 0);
 
 private:
 #ifndef _WIN32

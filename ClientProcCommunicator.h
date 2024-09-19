@@ -27,7 +27,7 @@ public:
         sem_wait(m_slave_received);
         sem_wait(m_slave_sent);
 
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
+        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
             reponse = Response(*repsonsePtr);
@@ -48,7 +48,6 @@ public:
         {
             if (sem_trywait(m_slave_ready) == 0)
             {
-                printf("semaphore acquired on time %zu\n", i);
                 is_slave_ready = true;
                 break;
             }
@@ -67,7 +66,7 @@ public:
         sem_wait(m_slave_received);
         sem_wait(m_slave_sent);
 
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
+        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
             reponse = Response(*repsonsePtr);

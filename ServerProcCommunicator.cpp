@@ -72,7 +72,7 @@ ServerProcCommunicator::~ServerProcCommunicator()
 
 void ServerProcCommunicator::send(const Message *msg)
 {
-    m_sender->sendMessage(msg);
+    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
     sem_post(m_slave_sent);
     sem_wait(m_master_received);
     sem_post(m_slave_ready);

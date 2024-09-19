@@ -12,7 +12,7 @@
 
 #include <thread>
 #include <chrono>
-static const std::string shared_mem_name{"/shmsh__48"};
+static const std::string shared_mem_name{"/shmsh__50"};
 static constexpr size_t MSG_COUNT = 100;
 
 void backgroundTask1()
@@ -158,7 +158,7 @@ int main()
             // std::cout << "Server st1 "<<counter<<std::endl;
             Message msg{777, MessageType::HANDSHAKE_OK};
             Message *res = slave->receive();
-            std::this_thread::sleep_for(std::chrono::milliseconds(7)); //slow response to simulate different calcualations
+            //std::this_thread::sleep_for(std::chrono::milliseconds(7)); //slow response to simulate different calcualations
             msg.id = res->id;
             slave->send(&msg);
 
