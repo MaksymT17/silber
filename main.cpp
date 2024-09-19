@@ -12,8 +12,8 @@
 #include <cassert>
 #include <thread>
 #include <chrono>
-static const std::string shared_mem_name{"/shmsh__52"};
-static constexpr size_t MSG_COUNT = 10000;
+static const std::string shared_mem_name{"/shmsh__54"};
+static constexpr size_t MSG_COUNT = 100;
 
 void backgroundTask1()
 {
@@ -90,7 +90,7 @@ void backgroundTask4()
     while (counter < MSG_COUNT)
     {
         master.sendRequestGetResponse(&request, &response);
-        std::cout << "m 4 =" << response->id << std::endl;
+        //std::cout << "m 4 =" << response->id << std::endl;
         counter++;
     }
 
@@ -109,7 +109,7 @@ void backgroundTask5()
     while (counter < MSG_COUNT)
     {
         master.sendRequestGetResponse(&request, &response);
-        // std::cout << "m 5 =" << response.id << std::endl;
+         std::cout << "m 5 =" << response->id << std::endl;
         counter++;
     }
 

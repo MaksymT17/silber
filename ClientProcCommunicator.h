@@ -104,10 +104,8 @@ public:
             printf("is_slave_ready is not ready after the requested timeout %zu result\n", timeout_ms, result);
             ReleaseSemaphore(m_master_sent, 1, NULL);
             ReleaseSemaphore(m_master_received, 1, NULL);
-            ReleaseSemaphore(m_slave_ready, 1, NULL);
             return false;
         }
-        WaitForSingleObject(m_slave_ready, INFINITE);
 
         m_sender->sendMessage(request);
         ReleaseSemaphore(m_master_sent, 1, NULL);

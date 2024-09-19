@@ -1,0 +1,30 @@
+name: Linux build
+
+on:
+  pull_request:
+    branches: [ "master" ]
+
+permissions:
+  issues: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install packages
+      run: sudo apt -y install git g++ cmake
+    - name: Clone silber repo
+      run: git clone --branch ${{ github.head_ref }} https://github.com/MaksymT17/silber.git
+    - name: Build artifacts with Cmake
+      run: |
+        cd silber &&
+        mkdir -p build &&
+        cd build &&
+        cmake .. &&
+        make &&
+        ./silber_test

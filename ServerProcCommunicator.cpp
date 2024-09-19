@@ -90,9 +90,10 @@ Message *ServerProcCommunicator::receive()
 #else
 void ServerProcCommunicator::send(const Message *msg)
 {
-    m_sender->sendMessage(msg);
+    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
     ReleaseSemaphore(m_slave_sent, 1, NULL);
     WaitForSingleObject(m_master_received, INFINITE);
+    ReleaseSemaphore(m_slave_ready, 1, NULL);
 }
 
 Message *ServerProcCommunicator::receive()
