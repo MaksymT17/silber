@@ -9,27 +9,32 @@
 #include <unistd.h>
 #endif
 #include <future>
-
+#include <cassert>
 #include <thread>
 #include <chrono>
-static const std::string shared_mem_name{"/shmsh__50"};
-static constexpr size_t MSG_COUNT = 100;
+static const std::string shared_mem_name{"/shmsh__52"};
+static constexpr size_t MSG_COUNT = 10000;
 
 void backgroundTask1()
 {
     std::cout << "Background Master_1 starting...\n";
     ClientProcCommunicator master(shared_mem_name);
     Message request{1, MessageType::HANDSHAKE};
-    Message response{666, MessageType::HANDSHAKE};
+    Message *response{nullptr};
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        if(!master.sendRequestGetResponse(&request, response,5))
-            std::cout << "failed to get response in time, skipping response.\n";
+        if (!master.sendRequestGetResponse(&request, &response, 5))
+            printf("failed to get response in time, skipping response.\n");
         else
-            std::cout << "m 1 =" << response.id << " " << response.type << std::endl;
+        {
+            assert(response->id == 1);
+            assert(response->type == 1);
+        }
+        // else // if returned true, ptr must be valid
+        //     std::cout << "m 1 =" << response->id << " " << response->type << std::endl;
         counter++;
     }
 
@@ -38,16 +43,16 @@ void backgroundTask1()
 
 void backgroundTask2()
 {
-    // std::cout << "Background Master_2 starting...\n";
+    std::cout << "Background Master_2 starting...\n";
     ClientProcCommunicator master(shared_mem_name);
     Message request{2, MessageType::HANDSHAKE};
-    Message response{666, MessageType::HANDSHAKE};
+    Message *response;
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        master.sendRequestGetResponse(&request, response);
+        master.sendRequestGetResponse(&request, &response);
         // std::cout << "m 2 =" << response.id << std::endl;
         counter++;
     }
@@ -60,13 +65,13 @@ void backgroundTask3()
     std::cout << "Background Master_3 starting...\n";
     ClientProcCommunicator master(shared_mem_name);
     Message request{3, MessageType::HANDSHAKE};
-    Message response{666, MessageType::HANDSHAKE};
+    Message *response;
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        master.sendRequestGetResponse(&request, response);
+        master.sendRequestGetResponse(&request, &response);
         counter++;
     }
 
@@ -78,14 +83,14 @@ void backgroundTask4()
     std::cout << "Background Master_4 starting...\n";
     ClientProcCommunicator master(shared_mem_name);
     Message request{4, MessageType::HANDSHAKE};
-    Message response{666, MessageType::HANDSHAKE};
+    Message *response;
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        master.sendRequestGetResponse(&request, response);
-        // std::cout << "m 2 =" << response.id << std::endl;
+        master.sendRequestGetResponse(&request, &response);
+        std::cout << "m 4 =" << response->id << std::endl;
         counter++;
     }
 
@@ -97,13 +102,13 @@ void backgroundTask5()
     std::cout << "Background Master_5 starting...\n";
     ClientProcCommunicator master(shared_mem_name);
     Message request{5, MessageType::HANDSHAKE};
-    Message response{666, MessageType::HANDSHAKE};
+    Message *response;
 
     int counter = 0;
 
     while (counter < MSG_COUNT)
     {
-        master.sendRequestGetResponse(&request, response);
+        master.sendRequestGetResponse(&request, &response);
         // std::cout << "m 5 =" << response.id << std::endl;
         counter++;
     }
@@ -125,7 +130,7 @@ int main()
         {
             Message msg{777, MessageType::HANDSHAKE_OK};
             Message *res = slave->receive();
-             
+
             msg.id = res->id;
             slave->send(&msg);
 
@@ -158,7 +163,7 @@ int main()
             // std::cout << "Server st1 "<<counter<<std::endl;
             Message msg{777, MessageType::HANDSHAKE_OK};
             Message *res = slave->receive();
-            //std::this_thread::sleep_for(std::chrono::milliseconds(7)); //slow response to simulate different calcualations
+            // std::this_thread::sleep_for(std::chrono::milliseconds(7)); //slow response to simulate different calcualations
             msg.id = res->id;
             slave->send(&msg);
 

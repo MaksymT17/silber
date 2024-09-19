@@ -14,12 +14,9 @@ public:
     virtual ~ClientProcCommunicator() = default;
 
 #ifndef _WIN32
-    // according to defined message flow user sends request and allocates response
-    // server will respond and fulfill needed response
-
-    ///note: blocking call, which will wait until server will repsond
+    /// note: blocking call, which will wait until server will repsond
     template <typename Response>
-    void sendRequestGetResponse(const Message *request, Response &reponse)
+    void sendRequestGetResponse(const Message *request, Response **reponse)
     {
         sem_wait(m_slave_ready);
         m_sender->sendMessage(request);
@@ -30,24 +27,25 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
-            reponse = Response(*repsonsePtr);
+            *reponse = repsonsePtr;
         else
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
         sem_post(m_master_received);
     }
 
-    ///note: non-blocking call, if response will be not provided method returns false.
+    /// note: non-blocking call, if response will be not provided method returns false.
     // Real-time computing implementation. User can skip Server answer if it is too late.
     // Next request could be sent instead.
     template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response &reponse, size_t timeout_ms)
+    bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
     {
         bool is_slave_ready{false};
         for (size_t i = 0; i <= timeout_ms; i += WAIT_POLL_PERIOD)
         {
             if (sem_trywait(m_slave_ready) == 0)
             {
+                //printf("is_slave_ready acquired %zu\n", i);
                 is_slave_ready = true;
                 break;
             }
@@ -69,7 +67,7 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
-            reponse = Response(*repsonsePtr);
+            *reponse = repsonsePtr; // Response(*repsonsePtr);
         else
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
@@ -79,7 +77,7 @@ public:
 
 #else
     template <typename Response>
-    void sendRequestGetResponse(const Message *request, Response &reponse)
+    void sendRequestGetResponse(const Message *request, Response **reponse)
     {
         WaitForSingleObject(m_slave_ready, INFINITE);
 
@@ -88,42 +86,42 @@ public:
         WaitForSingleObject(m_slave_received, INFINITE);
         WaitForSingleObject(m_slave_sent, INFINITE);
 
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
+        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
-            reponse = Response(*repsonsePtr);
+            *reponse = repsonsePtr;
         else
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
         ReleaseSemaphore(m_master_received, 1, NULL);
     }
     template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response &reponse, size_t timeout_ms)
-     {
-         DWORD result = WaitForSingleObject(m_slave_ready, timeout_ms);
-         if (result == WAIT_TIMEOUT || result != WAIT_OBJECT_0)
-         {
+    bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
+    {
+        DWORD result = WaitForSingleObject(m_slave_ready, timeout_ms);
+        if (result == WAIT_TIMEOUT || result != WAIT_OBJECT_0)
+        {
             printf("is_slave_ready is not ready after the requested timeout %zu result\n", timeout_ms, result);
             ReleaseSemaphore(m_master_sent, 1, NULL);
             ReleaseSemaphore(m_master_received, 1, NULL);
             ReleaseSemaphore(m_slave_ready, 1, NULL);
             return false;
-         }
-         WaitForSingleObject(m_slave_ready, INFINITE);
+        }
+        WaitForSingleObject(m_slave_ready, INFINITE);
 
-         m_sender->sendMessage(request);
-         ReleaseSemaphore(m_master_sent, 1, NULL);
-         WaitForSingleObject(m_slave_received, INFINITE);
-         WaitForSingleObject(m_slave_sent, INFINITE);
+        m_sender->sendMessage(request);
+        ReleaseSemaphore(m_master_sent, 1, NULL);
+        WaitForSingleObject(m_slave_received, INFINITE);
+        WaitForSingleObject(m_slave_sent, INFINITE);
 
-         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage());
+        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
-         if (repsonsePtr)
-             reponse = Response(*repsonsePtr);
-         else
-             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
+        if (repsonsePtr)
+            *reponse = repsonsePtr;
+        else
+            std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
-         ReleaseSemaphore(m_master_received, 1, NULL);
-     }
+        ReleaseSemaphore(m_master_received, 1, NULL);
+    }
 #endif
 };
