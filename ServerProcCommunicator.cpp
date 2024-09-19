@@ -75,6 +75,7 @@ void ServerProcCommunicator::send(const Message *msg)
     m_sender->sendMessage(msg);
     sem_post(m_slave_sent);
     sem_wait(m_master_received);
+    sem_post(m_slave_ready);
 }
 
 Message *ServerProcCommunicator::receive()

@@ -10,8 +10,10 @@
 #endif
 #include <future>
 
-static const std::string shared_mem_name{"/shmsh__47"};
-static constexpr size_t MSG_COUNT = 10000;
+#include <thread>
+#include <chrono>
+static const std::string shared_mem_name{"/shmsh__48"};
+static constexpr size_t MSG_COUNT = 100;
 
 void backgroundTask1()
 {
@@ -24,8 +26,10 @@ void backgroundTask1()
 
     while (counter < MSG_COUNT)
     {
-        master.sendRequestGetResponse(&request, response);
-        std::cout << "m 1 =" << response.id << " " << response.type << std::endl;
+        if(!master.sendRequestGetResponse(&request, response,5))
+            std::cout << "failed to get response in time, skipping response.\n";
+        else
+            std::cout << "m 1 =" << response.id << " " << response.type << std::endl;
         counter++;
     }
 
@@ -121,7 +125,7 @@ int main()
         {
             Message msg{777, MessageType::HANDSHAKE_OK};
             Message *res = slave->receive();
-            // usleep(6000);
+             
             msg.id = res->id;
             slave->send(&msg);
 
@@ -154,7 +158,7 @@ int main()
             // std::cout << "Server st1 "<<counter<<std::endl;
             Message msg{777, MessageType::HANDSHAKE_OK};
             Message *res = slave->receive();
-            // usleep(6000);
+            std::this_thread::sleep_for(std::chrono::milliseconds(7)); //slow response to simulate different calcualations
             msg.id = res->id;
             slave->send(&msg);
 
