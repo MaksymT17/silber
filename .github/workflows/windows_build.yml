@@ -25,5 +25,10 @@ jobs:
           cd build/ &&
           cmake .. &&
           cmake --build . --config Debug
-          cd Debug
         shell: bash
+
+      - name: Run the binary
+        run: |
+          cd silber/build/Debug
+          .\silber_test.exe
+        shell: cmd

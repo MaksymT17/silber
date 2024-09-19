@@ -11,7 +11,6 @@
 #include <exception>
 #include "SharedMemorySender.h"
 
-
 SharedMemorySender::SharedMemorySender(const char *shMemName) : m_name(shMemName)
 {
     init();
@@ -74,7 +73,7 @@ void SharedMemorySender::finish()
 
 void SharedMemorySender::sendMessage(const Message *msg, const size_t offset)
 {
-    std::memcpy(static_cast<char*>(m_ptr)+offset, msg, msg->size);
+    std::memcpy(static_cast<char *>(m_ptr) + offset, msg, msg->size);
 }
 
 #else
@@ -103,8 +102,8 @@ void SharedMemorySender::finish()
     CloseHandle(m_shm_fd);
 }
 
-void SharedMemorySender::sendMessage(const Message *msg)
+void SharedMemorySender::sendMessage(const Message *msg, const size_t offset)
 {
-    CopyMemory(m_ptr, msg, msg->size);
+    CopyMemory(static_cast<char *>(m_ptr) + offset, msg, msg->size);
 }
 #endif
