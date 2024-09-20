@@ -43,7 +43,7 @@ jobs:
         mkdir -p build/linux_release/lib &&
         mkdir -p build/linux_release/include &&
         cp -r *.h build/linux_release/include &&
-        cp build/libsilber-1.0.a build/linux_release/lib
+        cp build/libsilber-1.1.a build/linux_release/lib
 
     - name: Upload Linux(Ubuntu)build artifacts
       uses: actions/upload-artifact@v3
@@ -82,13 +82,13 @@ jobs:
           mkdir -p build/windows_release/lib &&
           mkdir -p build/windows_release/include &&
           cp -r *.h build/windows_release/include &&
-          cp build/Release/silber-1.0.lib build/windows_release/lib
+          cp build/Release/silber-1.1.lib build/windows_release/lib
         shell: bash
 
       - name: Upload Windows build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: windows-release
+          name: windows_release
           path: silber/build/windows_release
 
 
@@ -123,7 +123,7 @@ jobs:
         mkdir -p build/macos_release/lib &&
         mkdir -p build/macos_release/include &&
         cp -r *.h build/macos_release/include &&
-        cp build/libsilber-1.0.a build/macos_release/lib
+        cp build/libsilber-1.1.a build/macos_release/lib
   
     - name: Upload MacOS build artifacts
       uses: actions/upload-artifact@v3
