@@ -18,8 +18,15 @@ jobs:
     - uses: actions/checkout@v3
     - name: Install packages
       run: sudo apt -y install git g++ cmake
-    - name: Clone silber repo
-      run: git clone --branch ${{ github.head_ref }} https://github.com/MaksymT17/silber.git
+
+    - name: Checkout silber repo
+      uses: actions/checkout@v3
+      with:
+        repository: MaksymT17/silber
+        ref: ${{ github.head_ref }}  # Use the head reference of the pull request
+        path: silber
+        fetch-depth: 1
+
     - name: Build artifacts with Cmake
       run: |
         cd silber &&

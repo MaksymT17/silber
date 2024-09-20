@@ -9,11 +9,13 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Clone aquamarine repo
-        run: git clone --branch ${{ github.head_ref }} https://github.com/MaksymT17/silber.git
-        shell: bash
+      - name: Checkout aquamarine repo
+        uses: actions/checkout@v3
+        with:
+          repository: MaksymT17/silber
+          ref: ${{ github.head_ref }}  # Use the head reference of the pull request
+          path: silber
+          fetch-depth: 1  # Shallow clone
 
       - name: Build artifacts with Cmake
         run: |
