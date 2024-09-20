@@ -13,8 +13,19 @@ ADD_LIBRARY(silber-1.0 STATIC
     ClientProcCommunicator.cpp
     ServerProcCommunicator.cpp)
 
-install(TARGETS silber-1.0 DESTINATION lib)
-install(FILES Message.hpp DESTINATION include )
+# install library if it is needed by multiple targets
+install(TARGETS silber-1.0
+EXPORT silber-1.0-config
+ DESTINATION lib)
+
+ install(FILES 
+    Message.h 
+    SharedMemoryReceiver.h
+    ServerProcCommunicator.h
+    SharedMemorySender.h
+    ClientProcCommunicator.h
+    ProcCommunicator.h
+    SharedMemoryReceiver.h DESTINATION include)
 
 add_executable(silber_test main.cpp)
 target_link_libraries(silber_test silber-1.0)

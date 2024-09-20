@@ -16,8 +16,9 @@ public:
 #ifndef _WIN32
     /// note: blocking call, which will wait until server will repsond
     template <typename Response>
-    void sendRequestGetResponse(const Message *request, Response **reponse)
+    bool sendRequestGetResponse(const Message *request, Response **reponse)
     {
+        bool result{true};
         sem_wait(m_slave_ready);
         m_sender->sendMessage(request);
         sem_post(m_master_sent);
@@ -28,10 +29,12 @@ public:
 
         if (repsonsePtr)
             *reponse = repsonsePtr;
-        else
+        else{
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
-
+            result = false;
+        }
         sem_post(m_master_received);
+        return result;
     }
 
     /// note: non-blocking call, if response will be not provided method returns false.
