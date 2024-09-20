@@ -28,8 +28,11 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
+        {
             *reponse = repsonsePtr;
-        else{
+        }
+        else
+        {
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
             result = false;
         }
@@ -48,7 +51,7 @@ public:
         {
             if (sem_trywait(m_slave_ready) == 0)
             {
-                //printf("is_slave_ready acquired %zu\n", i);
+                // printf("is_slave_ready acquired %zu\n", i);
                 is_slave_ready = true;
                 break;
             }
@@ -80,8 +83,9 @@ public:
 
 #else
     template <typename Response>
-    void sendRequestGetResponse(const Message *request, Response **reponse)
+    bool sendRequestGetResponse(const Message *request, Response **reponse)
     {
+        bool result{true};
         WaitForSingleObject(m_slave_ready, INFINITE);
 
         m_sender->sendMessage(request);
@@ -92,16 +96,23 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
+        {
             *reponse = repsonsePtr;
+        }
         else
+        {
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
+            result = false;
+        }
 
         ReleaseSemaphore(m_master_received, 1, NULL);
+        return result;
     }
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
     {
         DWORD result = WaitForSingleObject(m_slave_ready, timeout_ms);
+        bool r_result{true};
         if (result == WAIT_TIMEOUT || result != WAIT_OBJECT_0)
         {
             printf("is_slave_ready is not ready after the requested timeout %zu result\n", timeout_ms, result);
@@ -118,11 +129,17 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
+        {
             *reponse = repsonsePtr;
+        }
         else
+        {
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
+            r_result = false;
+        }
 
         ReleaseSemaphore(m_master_received, 1, NULL);
+        return r_result;
     }
 #endif
 };
