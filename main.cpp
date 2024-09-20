@@ -12,8 +12,8 @@
 #include <cassert>
 #include <thread>
 #include <chrono>
-static const std::string shared_mem_name{"/shmsh__55"};
-static constexpr size_t MSG_COUNT = 200000;
+static const std::string shared_mem_name{"/shmsh1"};
+static constexpr size_t MSG_COUNT = 10000;
 
 void backgroundTask1()
 {
