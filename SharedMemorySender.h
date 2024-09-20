@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "Message.hpp"
+#include "Message.h"
 #ifdef _WIN32
 #include <windows.h>
 #include <stdio.h>

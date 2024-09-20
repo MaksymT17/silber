@@ -12,8 +12,8 @@
 #include <cassert>
 #include <thread>
 #include <chrono>
-static const std::string shared_mem_name{"/shmsh__54"};
-static constexpr size_t MSG_COUNT = 100;
+static const std::string shared_mem_name{"/shmsh__55"};
+static constexpr size_t MSG_COUNT = 200000;
 
 void backgroundTask1()
 {
@@ -26,7 +26,7 @@ void backgroundTask1()
 
     while (counter < MSG_COUNT)
     {
-        if (!master.sendRequestGetResponse(&request, &response, 5))
+        if (!master.sendRequestGetResponse(&request, &response))
             printf("failed to get response in time, skipping response.\n");
         else
         {
@@ -109,7 +109,7 @@ void backgroundTask5()
     while (counter < MSG_COUNT)
     {
         master.sendRequestGetResponse(&request, &response);
-         std::cout << "m 5 =" << response->id << std::endl;
+        // std::cout << "m 5 =" << response->id << std::endl;
         counter++;
     }
 
@@ -117,7 +117,7 @@ void backgroundTask5()
 }
 int main()
 {
-    {
+    /*{
         // test: one to one
         std::cout << "Server starts...\n";
         ServerProcCommunicator *slave = new ServerProcCommunicator(shared_mem_name);
@@ -143,7 +143,7 @@ int main()
 
         delete slave;
         std::cout << "Server has finished work...\n";
-    }
+    }*/
 
     {
         // test: one to many

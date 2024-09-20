@@ -4,7 +4,7 @@
 #include <iostream>
 #include "SharedMemorySender.h"
 #include "SharedMemoryReceiver.h"
-#include "Message.hpp"
+#include "Message.h"
 #ifndef _WIN32
 #include <semaphore.h>
 #include <iostream>
