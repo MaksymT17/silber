@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)  # Turn off compiler-specific extensions
 
-ADD_LIBRARY(silber-1.0 STATIC
+ADD_LIBRARY(silber-1.1 STATIC
     SharedMemoryReceiver.cpp
     SharedMemorySender.cpp
     ProcCommunicator.cpp
@@ -14,8 +14,8 @@ ADD_LIBRARY(silber-1.0 STATIC
     ServerProcCommunicator.cpp)
 
 # install library if it is needed by multiple targets
-install(TARGETS silber-1.0
-EXPORT silber-1.0-config
+install(TARGETS silber-1.1
+EXPORT silber-1.1-config
  DESTINATION lib)
 
  install(FILES 
@@ -28,4 +28,4 @@ EXPORT silber-1.0-config
     SharedMemoryReceiver.h DESTINATION include)
 
 add_executable(silber_test main.cpp)
-target_link_libraries(silber_test silber-1.0)
+target_link_libraries(silber_test silber-1.1)
