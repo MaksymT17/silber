@@ -33,3 +33,9 @@ jobs:
         cmake .. &&
         make &&
         ./silber_test
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: silber/build 

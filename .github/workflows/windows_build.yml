@@ -32,3 +32,9 @@ jobs:
           cd silber/build/Debug
           .\silber_test.exe
         shell: cmd
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-build-artifacts
+          path: silber/build/Debug
