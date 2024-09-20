@@ -38,4 +38,9 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: build-artifacts
-        path: silber/build 
+        path: silber/build
+
+    - name: Create download link
+      run: |
+        echo "Download the MacOS artifacts from the following link:"
+        echo "[Download Artifacts](https://github.com/${{ github.repository }}/actions/artifacts)"

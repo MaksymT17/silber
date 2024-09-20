@@ -38,3 +38,9 @@ jobs:
         with:
           name: windows-build-artifacts
           path: silber/build/Debug
+
+      - name: Create download link
+        run: |
+          echo "Download the Windows artifacts from the following link:"
+          echo "[Download Artifacts](https://github.com/${{ github.repository }}/actions/artifacts)"
+  

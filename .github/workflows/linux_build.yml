@@ -34,3 +34,8 @@ jobs:
       with:
         name: build-artifacts
         path: silber/build 
+
+    - name: Create download link
+      run: |
+        echo "Download the Linux artifacts from the following link:"
+        echo "[Download Artifacts](https://github.com/${{ github.repository }}/actions/artifacts)"
