@@ -1,0 +1,132 @@
+name: Prepare library & headers for Linux, Windows, MacOS
+
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+
+permissions:
+  issues: write
+  pull-requests: write
+  checks: write
+
+jobs:
+  build-linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install packages
+      run: sudo apt -y install git g++ cmake
+
+    - name: Checkout silber repo
+      uses: actions/checkout@v3
+      with:
+        repository: MaksymT17/silber
+        ref: ${{ github.head_ref }}  # Use the head reference of the pull request
+        path: silber
+
+    - name: Build artifacts with Cmake
+      run: |
+        cd silber &&
+        mkdir -p build &&
+        cd build &&
+        cmake -DCMAKE_BUILD_TYPE=Release .. &&
+        make
+
+    - name: Copy headers and library
+      run: |
+        cd silber &&
+        mkdir -p build/linux_release/lib &&
+        mkdir -p build/linux_release/include &&
+        cp -r *.h build/linux_release/include &&
+        cp build/libsilber-1.0.a build/linux_release/lib
+
+    - name: Upload Linux(Ubuntu)build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: linux_release
+        path: silber/build/linux_release
+
+
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout aquamarine repo
+        uses: actions/checkout@v3
+        with:
+          repository: MaksymT17/silber
+          ref: ${{ github.head_ref }}  # Use the head reference of the pull request
+          path: silber
+
+      - name: Build artifacts with Cmake
+        run: |
+          cd silber &&
+          echo "removing existing build folder..."
+          rm -rf build/ &&
+          mkdir build &&
+          echo "preparing new build with cmake..." &&
+          cd build/ &&
+          cmake .. &&
+          cmake --build . --config Release
+        shell: bash
+
+      - name: Copy headers and library
+        run: |
+          cd silber
+          mkdir -p build/windows_release/lib &&
+          mkdir -p build/windows_release/include &&
+          cp -r *.h build/windows_release/include &&
+          cp build/Release/silber-1.0.lib build/windows_release/lib
+        shell: bash
+
+      - name: Upload Windows build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-release
+          path: silber/build/windows_release
+
+
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+
+    - name: Install dependencies
+      run: |
+        brew install git gcc cmake 
+
+    - name: Checkout silber repo
+      uses: actions/checkout@v3
+      with:
+        repository: MaksymT17/silber
+        ref: ${{ github.head_ref }}  # Use the head reference of the pull request
+        path: silber
+
+    - name: Build artifacts with Cmake
+      run: |
+        cd silber &&
+        mkdir -p build &&
+        cd build &&
+        cmake -DCMAKE_BUILD_TYPE=Release .. &&
+        make
+
+    - name: Copy headers and library
+      run: |
+        cd silber &&
+        mkdir -p build/macos_release/lib &&
+        mkdir -p build/macos_release/include &&
+        cp -r *.h build/macos_release/include &&
+        cp build/libsilber-1.0.a build/macos_release/lib
+  
+    - name: Upload MacOS build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: macos_release
+        path: silber/build/macos_release
