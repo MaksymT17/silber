@@ -1,4 +1,4 @@
-name: Prepare library & headers for Linux, Windows, MacOS
+name: Debug build Linux & Windows & MacOS
 
 on:
   push:
