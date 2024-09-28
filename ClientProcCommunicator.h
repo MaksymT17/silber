@@ -43,6 +43,7 @@ public:
     /// note: non-blocking call, if response will be not provided method returns false.
     // Real-time computing implementation. User can skip Server answer if it is too late.
     // Next request could be sent instead.
+    // Calculation time is not included in timeout_ms. Calculations timeout can be set via configuration.
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
     {
@@ -51,7 +52,6 @@ public:
         {
             if (sem_trywait(m_slave_ready) == 0)
             {
-                // printf("is_slave_ready acquired %zu\n", i);
                 is_slave_ready = true;
                 break;
             }
@@ -60,7 +60,7 @@ public:
         if (!is_slave_ready)
         {
             printf("is_slave_ready is not ready after the requested timeout %zu\n", timeout_ms);
-            // release all semaphores, even if server respond - it will be out requested timebox
+            // release all semaphores, even if server respond later - it will be out of requested timebox
             sem_post(m_master_sent);
             sem_post(m_master_received);
             return false;
@@ -73,7 +73,7 @@ public:
         Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
-            *reponse = repsonsePtr; // Response(*repsonsePtr);
+            *reponse = repsonsePtr;
         else
             std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
 
@@ -115,7 +115,7 @@ public:
         bool r_result{true};
         if (result == WAIT_TIMEOUT || result != WAIT_OBJECT_0)
         {
-            printf("is_slave_ready is not ready after the requested timeout %zu result\n", timeout_ms, result);
+            std::cout << "is_slave_ready is not ready after the requested timeout: " << timeout_ms << std::endl;
             ReleaseSemaphore(m_master_sent, 1, NULL);
             ReleaseSemaphore(m_master_received, 1, NULL);
             return false;

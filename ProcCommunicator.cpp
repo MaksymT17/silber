@@ -19,49 +19,49 @@ ProcCommunicator::~ProcCommunicator()
 #ifndef _WIN32
     if (sem_close(m_master_received) == -1)
     {
-        perror("Failed to destroy m_master_received semaphore");
+        std::cerr << "Failed to destroy m_master_received semaphore\n";
     }
 
     if (sem_close(m_slave_received) == -1)
     {
-        perror("Failed to destroy m_slave_received semaphore");
+        std::cerr << "Failed to destroy m_slave_received semaphore\n";
     }
 
     if (sem_close(m_master_sent) == -1)
     {
-        perror("Failed to destroy m_master_sent semaphore");
+        std::cerr << "Failed to destroy m_master_sent semaphore\n";
     }
 
     if (sem_close(m_slave_sent) == -1)
     {
-        perror("Failed to destroy m_slave_sent semaphore");
+        std::cerr << "Failed to destroy m_slave_sent semaphore\n";
     }
 
     if (sem_close(m_slave_ready) == -1)
     {
-        perror("Failed to destroy m_slave_ready semaphore");
+        std::cerr << "Failed to destroy m_slave_ready semaphore\n";
     }
 
 #else
     if (m_master_received && !CloseHandle(m_master_received))
     {
-        perror("Failed to destroy m_master_received semaphore");
+        std::cerr << "Failed to destroy m_master_received semaphore\n";
     }
     if (m_slave_received && !CloseHandle(m_slave_received))
     {
-        perror("Failed to destroy m_slave_received semaphore");
+        std::cerr << "Failed to destroy m_slave_received semaphore\n";
     }
     if (m_master_sent && !CloseHandle(m_master_sent))
     {
-        perror("Failed to destroy m_master_sent semaphore");
+        std::cerr << "Failed to destroy m_master_sent semaphore\n";
     }
     if (m_slave_sent && !CloseHandle(m_slave_sent))
     {
-        perror("Failed to destroy m_slave_sent semaphore");
+        std::cerr << "Failed to destroy m_slave_sent semaphore\n";
     }
     if (m_slave_ready && !CloseHandle(m_slave_ready))
     {
-        perror("Failed to destroy m_slave_ready semaphore");
+        std::cerr << "Failed to destroy m_slave_ready semaphore\n";
     }
 #endif
 }

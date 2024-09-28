@@ -1,11 +1,7 @@
 name: Release build Linux & Windows & MacOS
 
 on:
-  push:
-    branches: [ "master" ]
-
   workflow_dispatch:
-
 
 permissions:
   issues: write

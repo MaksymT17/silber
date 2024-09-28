@@ -26,13 +26,13 @@ void SharedMemorySender::init()
             m_shm_fd = shm_open(m_name.c_str(), O_RDWR, 0666);
             if (m_shm_fd == -1)
             {
-                perror("shm_open failed");
+                std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
         else
         {
-            perror("shm_open failed");
+            std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
             exit(EXIT_FAILURE);
         }
     }
@@ -40,7 +40,7 @@ void SharedMemorySender::init()
     {
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
-            perror("ftruncate failed");
+            std::cerr << "SharedMemorySender::init ftruncate failed" << std::endl;
             exit(EXIT_FAILURE);
         }
     }

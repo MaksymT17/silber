@@ -3,9 +3,25 @@
 #include <stddef.h>
 #include <vector>
 
+#ifndef _WIN32
+#include <semaphore.h>
+#include <iostream>
+#include <fcntl.h>
+#include <unistd.h>
+#else
+#include <windows.h>
+#endif
+
 static constexpr size_t CLIENT_MEM_SIZE =  4096; // 4KB
 static constexpr size_t MAX_CLIENTS_COUNT = 8; // 8 clients can interact with server
 static constexpr size_t SHARED_MEMORY_SIZE = MAX_CLIENTS_COUNT * CLIENT_MEM_SIZE;
+
+#ifndef _WIN32
+using HANDLE = int;
+using N_SEM = sem_t*;
+#else
+    using N_SEM = HANDLE;
+#endif
 
 enum MessageType : size_t
 {

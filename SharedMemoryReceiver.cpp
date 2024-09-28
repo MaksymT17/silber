@@ -28,13 +28,14 @@ void SharedMemoryReceiver::init()
             m_shm_fd = shm_open(m_name.c_str(), O_RDWR, 0666);
             if (m_shm_fd == -1)
             {
+                std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
                 perror("shm_open failed");
                 exit(EXIT_FAILURE);
             }
         }
         else
         {
-            perror("shm_open failed");
+            std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
             exit(EXIT_FAILURE);
         }
     }
@@ -43,7 +44,7 @@ void SharedMemoryReceiver::init()
         // Segment created successfully, truncate it to the desired size
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
-            perror("ftruncate failed");
+            std::cerr << "SharedMemoryReceiver::init ftruncate failed\n";
             exit(EXIT_FAILURE);
         }
     }
@@ -51,7 +52,7 @@ void SharedMemoryReceiver::init()
     m_ptr = mmap(0, SHARED_MEMORY_SIZE, PROT_READ, MAP_SHARED, m_shm_fd, 0);
     if (m_ptr == MAP_FAILED)
     {
-        perror("mmap failed");
+        std::cerr << "SharedMemoryReceiver::init mmap failed\n";
         return;
     }
 }
@@ -78,12 +79,12 @@ void SharedMemoryReceiver::init()
     if (m_shm_fd == NULL)
     {
         m_shm_fd = CreateFileMappingW(
-            INVALID_HANDLE_VALUE, // use paging file
-            NULL,                 // default security
-            PAGE_READWRITE,       // read/write access
-            0,                    // maximum object size (high-order DWORD)
-            SHARED_MEMORY_SIZE,   // maximum object size (low-order DWORD)
-            wshMemName.c_str());  // name of mapping object
+            INVALID_HANDLE_VALUE,
+            NULL,
+            PAGE_READWRITE,
+            0,
+            SHARED_MEMORY_SIZE,
+            wshMemName.c_str());
 
         if (m_shm_fd == NULL)
         {
@@ -93,8 +94,8 @@ void SharedMemoryReceiver::init()
         }
     }
 
-    m_ptr = (void *)MapViewOfFile(m_shm_fd,            // handle to map object
-                                  FILE_MAP_ALL_ACCESS, // read/write permission
+    m_ptr = (void *)MapViewOfFile(m_shm_fd,
+                                  FILE_MAP_ALL_ACCESS,
                                   0,
                                   0,
                                   SHARED_MEMORY_SIZE);

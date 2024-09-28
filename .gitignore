@@ -1,0 +1,4 @@
+# ignore temporary files/dirs
+.DS_Store
+.vscode/
+build/
