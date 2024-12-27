@@ -4,14 +4,13 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
-#include <mutex>
+#include <cassert>
+
+
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#include <future>
-#include <cassert>
-#include <thread>
-#include <chrono>
+
 static const std::string shared_mem_name{"/shmsh1"};
 static constexpr size_t MSG_COUNT = 10000;
 
@@ -90,7 +89,7 @@ void backgroundTask4()
     while (counter < MSG_COUNT)
     {
         master.sendRequestGetResponse(&request, &response);
-        //std::cout << "m 4 =" << response->id << std::endl;
+        // std::cout << "m 4 =" << response->id << std::endl;
         counter++;
     }
 
