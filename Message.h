@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <vector>
+#include <cstdint>
 
 #ifndef _WIN32
 #include <semaphore.h>
