@@ -42,7 +42,7 @@ jobs:
         cp build/libsilber-1.1.a build/linux_release/lib
 
     - name: Upload Linux(Ubuntu)build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: linux_release
         path: silber/build/linux_release
@@ -82,7 +82,7 @@ jobs:
         shell: bash
 
       - name: Upload Windows build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows_release
           path: silber/build/windows_release
@@ -122,7 +122,7 @@ jobs:
         cp build/libsilber-1.1.a build/macos_release/lib
   
     - name: Upload MacOS build artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: macos_release
         path: silber/build/macos_release
