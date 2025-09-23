@@ -44,7 +44,7 @@ jobs:
         cd silber &&
         mkdir -p build/linux_debug/include &&
         cp -r *.h build/linux_debug/include &&
-        cp build/libsilber-1.1.a build/linux_debug/lib
+        cp build/libsilber-1.2.a build/linux_debug/lib
 
     - name: Upload Linux(Ubuntu)build artifacts
       uses: actions/upload-artifact@v4
@@ -83,7 +83,7 @@ jobs:
           mkdir -p build/windows_debug/lib &&
           mkdir -p build/windows_debug/include &&
           cp -r *.h build/windows_debug/include &&
-          cp build/Debug/silber-1.1.lib build/windows_debug/lib
+          cp build/Debug/silber-1.2.lib build/windows_debug/lib
         shell: bash
 
       - name: Upload Windows build artifacts
@@ -124,7 +124,7 @@ jobs:
         mkdir -p build/macos_debug/lib &&
         mkdir -p build/macos_debug/include &&
         cp -r *.h build/macos_debug/include &&
-        cp build/libsilber-1.1.a build/macos_debug/lib
+        cp build/libsilber-1.2.a build/macos_debug/lib
   
     - name: Upload MacOS build artifacts
       uses: actions/upload-artifact@v4
