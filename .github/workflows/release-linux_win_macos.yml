@@ -78,7 +78,7 @@ jobs:
           mkdir -p build/windows_release/lib &&
           mkdir -p build/windows_release/include &&
           cp -r *.h build/windows_release/include &&
-          cp build/Release/silber-1.1.lib build/windows_release/lib
+          cp build/Release/silber-1.2.lib build/windows_release/lib
         shell: bash
 
       - name: Upload Windows build artifacts
