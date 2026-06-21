@@ -1,8 +1,13 @@
 #include "ProcCommunicator.h"
 #include "ServerProcCommunicator.h"
 #include "ClientProcCommunicator.h"
+#include "SilberLogging.h"
 #include <iostream>
 #include <cstring>
+
+static void test_error_callback(const char *message) {
+    std::cerr << "[TESTS ERROR LOGGER]: " << message << std::endl;
+}
 #include <thread>
 #include <chrono>
 #include <cassert>
@@ -369,6 +374,9 @@ void test5_error_handling() {
     std::cout << "[Test 5] Starting Graceful Error Handling (No Exceptions / No Exit)..." << std::endl;
     setup_watchdog(3);
 
+    // Suppress logging during this test as these errors are expected
+    setSilberErrorCallback(nullptr);
+
     // Initialize with a name that is too long to trigger ENAMETOOLONG in shm_open
     std::string long_name(2000, 'A');
     ClientProcCommunicator client(long_name);
@@ -385,6 +393,9 @@ void test5_error_handling() {
 
     Message *incoming = server.receive();
     ASSERT_TRUE(incoming == nullptr);
+
+    // Restore logger callback
+    setSilberErrorCallback(test_error_callback);
 
     cancel_watchdog();
     std::cout << "[Test 5] PASSED" << std::endl;
@@ -530,6 +541,9 @@ void test_performance_benchmark() {
 }
 
 int main() {
+    // Set custom error callback to verify redirection
+    setSilberErrorCallback(test_error_callback);
+
 #ifndef _WIN32
     // Clean up any stale shared memory and semaphores from previous runs
     shm_unlink("/shm_test_suite_master");

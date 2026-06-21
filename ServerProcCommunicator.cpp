@@ -1,5 +1,6 @@
 #include "ServerProcCommunicator.h"
 #include "OSSemaphore.h"
+#include "SilberLogging.h"
 
 #ifndef _WIN32
 #include <sys/mman.h>
@@ -32,7 +33,7 @@ ServerProcCommunicator::ServerProcCommunicator(
 
     if (!m_master_sent->isValid() || !m_slave_sent->isValid() || !m_slave_ready->isValid())
     {
-        std::cerr << "ProcCommunicator sem_open failure.\n";
+        reportSilberError("ProcCommunicator sem_open failure.");
     }
 
     // Initialize/reset ClientSlotRegistry on startup to prevent stale process IDs

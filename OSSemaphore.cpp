@@ -1,5 +1,5 @@
 #include "OSSemaphore.h"
-#include <iostream>
+#include "SilberLogging.h"
 #include <chrono>
 #include <thread>
 
@@ -16,7 +16,7 @@ OSSemaphore::OSSemaphore(const std::string &name, bool create, int initialValue)
     m_sem = sem_open(m_name.c_str(), O_CREAT, 0666, initialValue);
     if (m_sem == SEM_FAILED)
     {
-        std::cerr << "OSSemaphore sem_open failure for: " << m_name << " error: " << strerror(errno) << std::endl;
+        reportSilberError("OSSemaphore sem_open failure for: %s error: %s", m_name.c_str(), strerror(errno));
     }
 }
 
@@ -26,7 +26,7 @@ OSSemaphore::~OSSemaphore()
     {
         if (sem_close(m_sem) == -1)
         {
-            std::cerr << "Failed to close semaphore " << m_name << ": " << strerror(errno) << std::endl;
+            reportSilberError("Failed to close semaphore %s: %s", m_name.c_str(), strerror(errno));
         }
     }
 }
@@ -117,7 +117,7 @@ OSSemaphore::OSSemaphore(const std::string &name, bool create, int initialValue)
     m_sem = CreateSemaphoreW(NULL, initialValue, MAXLONG, wname.c_str());
     if (m_sem == NULL)
     {
-        std::cerr << "OSSemaphore CreateSemaphoreW failure for: " << m_name << " error: " << GetLastError() << std::endl;
+        reportSilberError("OSSemaphore CreateSemaphoreW failure for: %s error: %d", m_name.c_str(), GetLastError());
     }
 }
 

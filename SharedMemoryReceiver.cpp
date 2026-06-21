@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cstdlib>
 #include <cstring>
 #ifndef _WIN32
@@ -8,9 +7,9 @@
 #else
 #include <windows.h>
 #include <string>
-#include <iostream>
 #endif
 #include "SharedMemoryReceiver.h"
+#include "SilberLogging.h"
 #include <vector>
 
 SharedMemoryReceiver::SharedMemoryReceiver(const char *shMemName) : m_name(shMemName)
@@ -33,15 +32,14 @@ void SharedMemoryReceiver::init()
             m_shm_fd = shm_open(m_name.c_str(), O_RDWR, 0666);
             if (m_shm_fd == -1)
             {
-                std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
-                perror("shm_open failed");
+                reportSilberError("SharedMemoryReceiver::init shm_open failed");
                 m_ptr = nullptr;
                 return;
             }
         }
         else
         {
-            std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
+            reportSilberError("SharedMemoryReceiver::init shm_open failed");
             m_ptr = nullptr;
             return;
         }
@@ -51,7 +49,7 @@ void SharedMemoryReceiver::init()
         // Segment created successfully, truncate it to the desired size
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
-            std::cerr << "SharedMemoryReceiver::init ftruncate failed\n";
+            reportSilberError("SharedMemoryReceiver::init ftruncate failed");
             m_ptr = nullptr;
             return;
         }
@@ -60,7 +58,7 @@ void SharedMemoryReceiver::init()
     m_ptr = mmap(0, SHARED_MEMORY_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, m_shm_fd, 0);
     if (m_ptr == MAP_FAILED)
     {
-        std::cerr << "SharedMemoryReceiver::init mmap failed\n";
+        reportSilberError("SharedMemoryReceiver::init mmap failed");
         m_ptr = nullptr;
     }
 }
@@ -70,7 +68,7 @@ void SharedMemoryReceiver::finish()
     {
         if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
         {
-            std::cerr << "munmap failed" << std::endl;
+            reportSilberError("munmap failed");
         }
         m_ptr = nullptr;
     }
@@ -78,7 +76,7 @@ void SharedMemoryReceiver::finish()
     {
         if (close(m_shm_fd) == -1)
         {
-            std::cerr << "close failed" << std::endl;
+            reportSilberError("close failed");
         }
         m_shm_fd = -1;
     }
@@ -104,8 +102,7 @@ void SharedMemoryReceiver::init()
 
         if (m_shm_fd == NULL)
         {
-            printf(("Could not open file mapping object (%d).\n"),
-                   GetLastError());
+            reportSilberError("Could not open file mapping object (%d).", GetLastError());
             return;
         }
     }
@@ -118,10 +115,8 @@ void SharedMemoryReceiver::init()
 
     if (m_ptr == NULL)
     {
-        printf("Could not map view of file (%d).\n", GetLastError());
-
+        reportSilberError("Could not map view of file (%d).", GetLastError());
         CloseHandle(m_shm_fd);
-
         return;
     }
 }

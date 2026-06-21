@@ -14,7 +14,8 @@ ADD_LIBRARY(silber-1.2 STATIC
     ClientProcCommunicator.cpp
     ServerProcCommunicator.cpp
     SlotRegistry.cpp
-    OSSemaphore.cpp)
+    OSSemaphore.cpp
+    SilberLogging.cpp)
 
 # install library if it is needed by multiple targets
 install(TARGETS silber-1.2

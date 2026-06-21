@@ -1,7 +1,7 @@
 #include "ClientProcCommunicator.h"
 #include "OSSemaphore.h"
 #include "SlotRegistry.h"
-#include <iostream>
+#include "SilberLogging.h"
 
 ClientProcCommunicator::ClientProcCommunicator(const std::string &shMemName)
     : ClientProcCommunicator(
@@ -23,7 +23,7 @@ ClientProcCommunicator::ClientProcCommunicator(
 
     if (!m_master_sent->isValid() || !m_slave_sent->isValid() || !m_slave_ready->isValid())
     {
-        std::cerr << "ProcCommunicator sem_open failure.\n";
+        reportSilberError("ProcCommunicator sem_open failure.");
     }
 
     // Dynamic slot allocation
@@ -36,7 +36,7 @@ ClientProcCommunicator::ClientProcCommunicator(
 
     if (m_slot_index == -1)
     {
-        std::cerr << "ClientProcCommunicator warning: all communication slots are occupied or initialization failed.\n";
+        reportSilberError("ClientProcCommunicator warning: all communication slots are occupied or initialization failed.");
     }
 }
 
