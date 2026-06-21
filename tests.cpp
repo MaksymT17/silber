@@ -273,6 +273,66 @@ void test5_error_handling() {
     std::cout << "[Test 5] PASSED" << std::endl;
 }
 
+// TEST 6: Performance Benchmark
+void run_benchmark_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    for (int i = 0; i < 100000; ++i) {
+        Message *req = server.receive();
+        if (req) {
+            Message resp(req->id, MessageType::HANDSHAKE_OK);
+            server.send(&resp);
+        }
+    }
+    std::exit(0);
+}
+
+void run_benchmark_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    Message req(1, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < 100000; ++i) {
+        bool ok = client.sendRequestGetResponse(&req, &resp);
+        ASSERT_TRUE(ok);
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    std::cout << "[Benchmark] 100,000 round-trips completed." << std::endl;
+    std::cout << "[Benchmark] Total Time: " << elapsed_ms << " ms" << std::endl;
+    std::cout << "[Benchmark] Latency: " << (elapsed_ms * 1000.0 / 100000.0) << " microseconds / round-trip" << std::endl;
+    std::cout << "[Benchmark] Throughput: " << (100000.0 / (elapsed_ms / 1000.0)) << " round-trips / sec" << std::endl;
+    std::exit(0);
+}
+
+void test_performance_benchmark() {
+    std::cout << "[Benchmark] Starting Performance Benchmark (100,000 round-trips)..." << std::endl;
+    pid_t server_pid = fork();
+    if (server_pid == 0) {
+        run_benchmark_server();
+    }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    setup_watchdog(30); // 30 seconds watchdog
+    
+    pid_t client_pid = fork();
+    if (client_pid == 0) {
+        run_benchmark_client();
+    }
+    
+    int client_status;
+    waitpid(client_pid, &client_status, 0);
+    cancel_watchdog();
+    
+    kill(server_pid, SIGKILL);
+    int status;
+    waitpid(server_pid, &status, 0);
+    
+    ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
+    std::cout << "[Benchmark] Completed successfully." << std::endl;
+}
+
 int main() {
     // Clean up any stale shared memory and semaphores from previous runs
     shm_unlink("/shm_test_suite_master");
@@ -302,6 +362,9 @@ int main() {
     std::cout << "------------------------------------------" << std::endl;
 
     test5_error_handling();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test_performance_benchmark();
     std::cout << "------------------------------------------" << std::endl;
     
     std::cout << "ALL TESTS COMPLETED" << std::endl;
