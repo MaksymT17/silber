@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <iostream>
+#include "ISemaphore.h"
 #include "SharedMemorySender.h"
 #include "SharedMemoryReceiver.h"
 #include "Message.h"
@@ -33,6 +34,12 @@ protected:
     ProcCommunicator(const std::string &shMemName,
                      std::unique_ptr<ISharedMemorySender> sender,
                      std::unique_ptr<ISharedMemoryReceiver> receiver);
+    ProcCommunicator(const std::string &shMemName,
+                     std::unique_ptr<ISharedMemorySender> sender,
+                     std::unique_ptr<ISharedMemoryReceiver> receiver,
+                     std::unique_ptr<ISemaphore> master_sent,
+                     std::unique_ptr<ISemaphore> slave_sent,
+                     std::unique_ptr<ISemaphore> slave_ready);
     virtual ~ProcCommunicator();
 
 protected:
@@ -46,7 +53,7 @@ protected:
     const std::string m_master_mem_name;
     const std::string m_slave_mem_name;
 
-    N_SEM m_master_sent;
-    N_SEM m_slave_sent;
-    N_SEM m_slave_ready;
+    std::unique_ptr<ISemaphore> m_master_sent;
+    std::unique_ptr<ISemaphore> m_slave_sent;
+    std::unique_ptr<ISemaphore> m_slave_ready;
 };

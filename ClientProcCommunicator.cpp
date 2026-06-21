@@ -1,4 +1,5 @@
 #include "ClientProcCommunicator.h"
+#include "OSSemaphore.h"
 #include "SlotRegistry.h"
 #include <iostream>
 
@@ -16,27 +17,14 @@ ClientProcCommunicator::ClientProcCommunicator(
     std::unique_ptr<ISharedMemoryReceiver> receiver)
     : ProcCommunicator(shMemName, std::move(sender), std::move(receiver))
 {
-#ifndef _WIN32
-    m_master_sent = sem_open(m_master_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_sent = sem_open(m_slave_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_ready = sem_open(m_slave_ready_s.c_str(), O_CREAT, 0666, N_SEM_ON);
+    m_master_sent = std::make_unique<OSSemaphore>(m_master_sent_s, true, N_SEM_OFF);
+    m_slave_sent = std::make_unique<OSSemaphore>(m_slave_sent_s, true, N_SEM_OFF);
+    m_slave_ready = std::make_unique<OSSemaphore>(m_slave_ready_s, true, N_SEM_ON);
 
-    if (m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED)
+    if (!m_master_sent->isValid() || !m_slave_sent->isValid() || !m_slave_ready->isValid())
     {
         std::cerr << "ProcCommunicator sem_open failure.\n";
     }
-#else
-    std::wstring wshMemName(shMemName.begin(), shMemName.end());
-
-    m_master_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_m_sent").c_str());
-    m_slave_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_s_sent").c_str());
-    m_slave_ready = CreateSemaphoreW(NULL, N_SEM_ON, MAXLONG, (wshMemName + L"_s_ready").c_str());
-
-    if (m_master_sent == NULL || m_slave_sent == NULL || m_slave_ready == NULL)
-    {
-        std::cerr << "ProcCommunicator sem_open failure.\n";
-    }
-#endif
 
     // Dynamic slot allocation
     m_slot_index = -1;
@@ -62,11 +50,8 @@ bool ClientProcCommunicator::isValid() const
     {
         return false;
     }
-#ifndef _WIN32
-    return m_master_sent != SEM_FAILED && m_slave_sent != SEM_FAILED && m_slave_ready != SEM_FAILED;
-#else
-    return m_master_sent != NULL && m_slave_sent != NULL && m_slave_ready != NULL;
-#endif
+    return m_master_sent && m_slave_sent && m_slave_ready &&
+           m_master_sent->isValid() && m_slave_sent->isValid() && m_slave_ready->isValid();
 }
 
 ClientProcCommunicator::~ClientProcCommunicator()

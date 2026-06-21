@@ -27,38 +27,25 @@ ProcCommunicator::ProcCommunicator(const std::string &shMemName,
       m_slave_ready_s(shMemName + "_s_ready")
 {
 }
+ProcCommunicator::ProcCommunicator(const std::string &shMemName,
+                                   std::unique_ptr<ISharedMemorySender> sender,
+                                   std::unique_ptr<ISharedMemoryReceiver> receiver,
+                                   std::unique_ptr<ISemaphore> master_sent,
+                                   std::unique_ptr<ISemaphore> slave_sent,
+                                   std::unique_ptr<ISemaphore> slave_ready)
+    : m_sender(std::move(sender)),
+      m_receiver(std::move(receiver)),
+      m_master_sent_s(shMemName + "_m_sent"),
+      m_slave_sent_s(shMemName + "_s_sent"),
+      m_slave_ready_s(shMemName + "_s_ready"),
+      m_master_mem_name(shMemName + "_master"),
+      m_slave_mem_name(shMemName + "_slave"),
+      m_master_sent(std::move(master_sent)),
+      m_slave_sent(std::move(slave_sent)),
+      m_slave_ready(std::move(slave_ready))
+{
+}
+
 ProcCommunicator::~ProcCommunicator()
 {
-#ifndef _WIN32
-    if (m_master_sent != SEM_FAILED && sem_close(m_master_sent) == -1)
-    {
-        std::cerr << "Failed to close m_master_sent semaphore: " << strerror(errno) << '\n';
-    }
-
-    if (m_slave_sent != SEM_FAILED && sem_close(m_slave_sent) == -1)
-    {
-        std::cerr << "Failed to close m_slave_sent semaphore: " << strerror(errno) << '\n';
-    }
-
-    if (m_slave_ready != SEM_FAILED && sem_close(m_slave_ready) == -1)
-    {
-        std::cerr << "Failed to close m_slave_ready semaphore: " << strerror(errno) << '\n';
-    }
-
-#else
-    if (m_master_sent != NULL && !CloseHandle(m_master_sent))
-    {
-        std::cerr << "Failed to close m_master_sent semaphore, error: " << GetLastError() << '\n';
-    }
-
-    if (m_slave_sent != NULL && !CloseHandle(m_slave_sent))
-    {
-        std::cerr << "Failed to close m_slave_sent semaphore, error: " << GetLastError() << '\n';
-    }
-
-    if (m_slave_ready != NULL && !CloseHandle(m_slave_ready))
-    {
-        std::cerr << "Failed to close m_slave_ready semaphore, error: " << GetLastError() << '\n';
-    }
-#endif
 }

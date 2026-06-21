@@ -13,7 +13,8 @@ ADD_LIBRARY(silber-1.2 STATIC
     ProcCommunicator.cpp
     ClientProcCommunicator.cpp
     ServerProcCommunicator.cpp
-    SlotRegistry.cpp)
+    SlotRegistry.cpp
+    OSSemaphore.cpp)
 
 # install library if it is needed by multiple targets
 install(TARGETS silber-1.2
