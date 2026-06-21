@@ -46,7 +46,7 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **response)
     {
-        if (m_slot_index == -1 || !m_slave_ready || !m_slave_sent || !m_master_sent)
+        if (!isValid())
         {
             return false;
         }
@@ -80,7 +80,7 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **response, size_t timeout_ms)
     {
-        if (m_slot_index == -1 || !m_slave_ready || !m_slave_sent || !m_master_sent)
+        if (!isValid())
         {
             return false;
         }
