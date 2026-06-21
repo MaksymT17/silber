@@ -2,6 +2,7 @@
 #include "ServerProcCommunicator.h"
 #include "ClientProcCommunicator.h"
 #include <iostream>
+#include <cstring>
 #include <thread>
 #include <chrono>
 #include <cassert>
@@ -41,6 +42,53 @@ static const std::string shared_mem_name{"/shm_test_suite"};
         std::exit(1); \
     } \
 } while(0)
+
+struct Configuration
+{
+    size_t AffinityThreshold;
+    size_t MinPixelsForObject;
+    uint8_t PixelStep;
+    double CalculationTimeLimit;
+    size_t IdleTimeout;
+    double ThreadsMultiplier;
+};
+
+struct MessageSetConfig : public Message
+{
+    MessageSetConfig() : Message()
+    {
+        size = sizeof(MessageSetConfig);
+        type = MessageType::SET_CONFIG;
+    }
+    Configuration configuration;
+};
+
+struct MessageCompareRequest : public Message
+{
+    MessageCompareRequest() : Message()
+    {
+        size = sizeof(MessageCompareRequest);
+        type = MessageType::COMPARE_REQUEST;
+    }
+    char base[200];
+    char to_compare[200];
+};
+
+struct Rect
+{
+    size_t l, r, t, b;
+};
+
+struct MessageCompareResult : public Message
+{
+    MessageCompareResult() : Message()
+    {
+        size = sizeof(MessageCompareResult);
+        type = MessageType::COMPARE_RESULT;
+    }
+    Rect payload[100];
+    size_t payload_bytes;
+};
 
 // Helper to run a watchdog timer
 void setup_watchdog(int seconds) {
@@ -375,6 +423,73 @@ void run_benchmark_client() {
     std::cout << "[Benchmark] Throughput: " << (100000.0 / (elapsed_ms / 1000.0)) << " round-trips / sec" << std::endl;
 }
 
+// TEST 6: OCP - User-defined/Extended Messages
+void run_test6_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    Message *req = server.receive();
+    if (req && req->type == MessageType::COMPARE_REQUEST) {
+        const MessageCompareRequest *comp_req = static_cast<const MessageCompareRequest*>(req);
+        ASSERT_TRUE(std::string(comp_req->base) == "base_image.png");
+        ASSERT_TRUE(std::string(comp_req->to_compare) == "target_image.png");
+
+        MessageCompareResult resp;
+        resp.id = req->id;
+        resp.payload_bytes = sizeof(Rect) * 2;
+        resp.payload[0] = {10, 20, 30, 40};
+        resp.payload[1] = {50, 60, 70, 80};
+        server.send(&resp);
+    }
+}
+
+void run_test6_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    MessageCompareRequest req;
+    req.id = 6;
+    std::strcpy(req.base, "base_image.png");
+    std::strcpy(req.to_compare, "target_image.png");
+
+    const MessageCompareResult *resp = nullptr;
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(resp != nullptr);
+    ASSERT_TRUE(resp->id == 6);
+    ASSERT_TRUE(resp->type == MessageType::COMPARE_RESULT);
+    ASSERT_TRUE(resp->payload_bytes == sizeof(Rect) * 2);
+    ASSERT_TRUE(resp->payload[0].l == 10);
+    ASSERT_TRUE(resp->payload[0].r == 20);
+    ASSERT_TRUE(resp->payload[1].l == 50);
+    ASSERT_TRUE(resp->payload[1].b == 80);
+}
+
+void test6_ocp_custom_messages() {
+    std::cout << "[Test 6] Starting OCP Custom Messages (Extended Payloads)..." << std::endl;
+#ifndef _WIN32
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        std::exit(1);
+    }
+    if (pid == 0) {
+        run_test6_server();
+        std::exit(0);
+    } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        setup_watchdog(5);
+        run_test6_client();
+        cancel_watchdog();
+        int status;
+        waitpid(pid, &status, 0);
+        std::cout << "[Test 6] PASSED" << std::endl;
+    }
+#else
+    std::thread server_thread(run_test6_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    run_test6_client();
+    server_thread.join();
+    std::cout << "[Test 6] PASSED" << std::endl;
+#endif
+}
+
 void test_performance_benchmark() {
     std::cout << "[Benchmark] Starting Performance Benchmark (100,000 round-trips)..." << std::endl;
 #ifndef _WIN32
@@ -419,8 +534,6 @@ int main() {
     // Clean up any stale shared memory and semaphores from previous runs
     shm_unlink("/shm_test_suite_master");
     shm_unlink("/shm_test_suite_slave");
-    sem_unlink("/shm_test_suite_m_rsem");
-    sem_unlink("/shm_test_suite_s_rsem");
     sem_unlink("/shm_test_suite_m_sent");
     sem_unlink("/shm_test_suite_s_sent");
     sem_unlink("/shm_test_suite_s_ready");
@@ -445,6 +558,9 @@ int main() {
     std::cout << "------------------------------------------" << std::endl;
 
     test5_error_handling();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test6_ocp_custom_messages();
     std::cout << "------------------------------------------" << std::endl;
 
     test_performance_benchmark();
