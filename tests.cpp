@@ -5,10 +5,12 @@
 #include <thread>
 #include <chrono>
 #include <cassert>
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#endif
 #include <csignal>
 
 #ifdef __APPLE__
@@ -42,11 +44,15 @@ static const std::string shared_mem_name{"/shm_test_suite"};
 
 // Helper to run a watchdog timer
 void setup_watchdog(int seconds) {
+#ifndef _WIN32
     alarm(seconds);
+#endif
 }
 
 void cancel_watchdog() {
+#ifndef _WIN32
     alarm(0);
+#endif
 }
 
 // TEST 1: Single Client-Server Roundtrip (Blocking IPC)
@@ -57,7 +63,6 @@ void run_test1_server() {
         Message resp(req->id, MessageType::HANDSHAKE_OK);
         server.send(&resp);
     }
-    std::exit(0);
 }
 
 void run_test1_client() {
@@ -74,6 +79,7 @@ void run_test1_client() {
 
 void test1_single_roundtrip() {
     std::cout << "[Test 1] Starting Single Client-Server Roundtrip (Blocking IPC)..." << std::endl;
+#ifndef _WIN32
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork failed");
@@ -82,6 +88,7 @@ void test1_single_roundtrip() {
     if (pid == 0) {
         // Child: Server
         run_test1_server();
+        std::exit(0);
     } else {
         // Parent: Client
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait for server to init
@@ -92,6 +99,13 @@ void test1_single_roundtrip() {
         waitpid(pid, &status, 0);
         std::cout << "[Test 1] PASSED" << std::endl;
     }
+#else
+    std::thread server_thread(run_test1_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    run_test1_client();
+    server_thread.join();
+    std::cout << "[Test 1] PASSED" << std::endl;
+#endif
 }
 
 // TEST 2: Multi-Client Concurrency Simulation
@@ -105,7 +119,6 @@ void run_test2_server() {
             server.send(&resp);
         }
     }
-    std::exit(0);
 }
 
 void run_test2_client(int id) {
@@ -118,14 +131,15 @@ void run_test2_client(int id) {
     ASSERT_TRUE(resp != nullptr);
     ASSERT_TRUE(resp->id == id);
     ASSERT_TRUE(resp->type == MessageType::HANDSHAKE_OK);
-    std::exit(0);
 }
 
 void test2_multi_client() {
     std::cout << "[Test 2] Starting Multi-Client Concurrency..." << std::endl;
+#ifndef _WIN32
     pid_t server_pid = fork();
     if (server_pid == 0) {
         run_test2_server();
+        std::exit(0);
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -136,6 +150,7 @@ void test2_multi_client() {
         pid_t c_pid = fork();
         if (c_pid == 0) {
             run_test2_client(i + 1); // ID 1 to 5
+            std::exit(0);
         }
         client_pids[i] = c_pid;
     }
@@ -151,6 +166,20 @@ void test2_multi_client() {
     waitpid(server_pid, &server_status, 0);
     cancel_watchdog();
     std::cout << "[Test 2] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test2_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    std::thread client_threads[5];
+    for (int i = 0; i < 5; ++i) {
+        client_threads[i] = std::thread(run_test2_client, i + 1);
+    }
+    for (int i = 0; i < 5; ++i) {
+        client_threads[i].join();
+    }
+    server_thread.join();
+    std::cout << "[Test 2] PASSED" << std::endl;
+#endif
 }
 
 // TEST 3: Non-Blocking Timeout Behavior
@@ -163,7 +192,6 @@ void run_test3_server() {
         Message resp(req->id, MessageType::HANDSHAKE_OK);
         server.send(&resp);
     }
-    std::exit(0);
 }
 
 void run_test3_client() {
@@ -182,14 +210,15 @@ void run_test3_client() {
     
     // The call should fail due to timeout
     ASSERT_TRUE(!ok);
-    std::exit(0);
 }
 
 void test3_timeout() {
     std::cout << "[Test 3] Starting Non-Blocking Timeout Test..." << std::endl;
+#ifndef _WIN32
     pid_t server_pid = fork();
     if (server_pid == 0) {
         run_test3_server();
+        std::exit(0);
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -201,6 +230,7 @@ void test3_timeout() {
     pid_t client_pid = fork();
     if (client_pid == 0) {
         run_test3_client();
+        std::exit(0);
     }
     
     int client_status;
@@ -214,6 +244,15 @@ void test3_timeout() {
     
     ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
     std::cout << "[Test 3] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test3_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_test3_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Test 3] PASSED" << std::endl;
+#endif
 }
 
 // TEST 4: Dynamic Transaction ID Stress (Large ID value)
@@ -224,7 +263,6 @@ void run_test4_server() {
         Message resp(req->id, MessageType::HANDSHAKE_OK);
         server.send(&resp);
     }
-    std::exit(0);
 }
 
 void run_test4_client() {
@@ -237,14 +275,15 @@ void run_test4_client() {
     ASSERT_TRUE(ok);
     ASSERT_TRUE(resp != nullptr);
     ASSERT_TRUE(resp->id == 100);
-    std::exit(0);
 }
 
 void test4_large_id() {
     std::cout << "[Test 4] Starting Large Transaction ID Test..." << std::endl;
+#ifndef _WIN32
     pid_t server_pid = fork();
     if (server_pid == 0) {
         run_test4_server();
+        std::exit(0);
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -253,6 +292,7 @@ void test4_large_id() {
     pid_t client_pid = fork();
     if (client_pid == 0) {
         run_test4_client();
+        std::exit(0);
     }
     
     int client_status;
@@ -265,6 +305,15 @@ void test4_large_id() {
     
     ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
     std::cout << "[Test 4] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test4_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_test4_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Test 4] PASSED" << std::endl;
+#endif
 }
 
 // TEST 5: Graceful Error Handling (No Exceptions / No Exit)
@@ -304,7 +353,6 @@ void run_benchmark_server() {
             server.send(&resp);
         }
     }
-    std::exit(0);
 }
 
 void run_benchmark_client() {
@@ -325,14 +373,15 @@ void run_benchmark_client() {
     std::cout << "[Benchmark] Total Time: " << elapsed_ms << " ms" << std::endl;
     std::cout << "[Benchmark] Latency: " << (elapsed_ms * 1000.0 / 100000.0) << " microseconds / round-trip" << std::endl;
     std::cout << "[Benchmark] Throughput: " << (100000.0 / (elapsed_ms / 1000.0)) << " round-trips / sec" << std::endl;
-    std::exit(0);
 }
 
 void test_performance_benchmark() {
     std::cout << "[Benchmark] Starting Performance Benchmark (100,000 round-trips)..." << std::endl;
+#ifndef _WIN32
     pid_t server_pid = fork();
     if (server_pid == 0) {
         run_benchmark_server();
+        std::exit(0);
     }
     
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -341,6 +390,7 @@ void test_performance_benchmark() {
     pid_t client_pid = fork();
     if (client_pid == 0) {
         run_benchmark_client();
+        std::exit(0);
     }
     
     int client_status;
@@ -353,9 +403,19 @@ void test_performance_benchmark() {
     
     ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
     std::cout << "[Benchmark] Completed successfully." << std::endl;
+#else
+    std::thread server_thread(run_benchmark_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_benchmark_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Benchmark] Completed successfully." << std::endl;
+#endif
 }
 
 int main() {
+#ifndef _WIN32
     // Clean up any stale shared memory and semaphores from previous runs
     shm_unlink("/shm_test_suite_master");
     shm_unlink("/shm_test_suite_slave");
@@ -370,6 +430,7 @@ int main() {
         std::cerr << "\n!!! WATCHDOG TIMEOUT: Test deadlocked or took too long !!!" << std::endl;
         std::exit(1);
     });
+#endif
 
     test1_single_roundtrip();
     std::cout << "------------------------------------------" << std::endl;

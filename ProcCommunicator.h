@@ -6,14 +6,14 @@
 #include "SharedMemoryReceiver.h"
 #include "Message.h"
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
+
 inline void cpu_yield()
 {
 #if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
     #if defined(_MSC_VER)
-        // MSVC pauses
-        #if !defined(__clang__)
-            #include <intrin.h>
-        #endif
         _mm_pause();
     #else
         __builtin_ia32_pause();
