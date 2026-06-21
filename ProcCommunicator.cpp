@@ -14,6 +14,19 @@ ProcCommunicator::ProcCommunicator(const std::string &shMemName) : m_master_mem_
                                                                    m_slave_ready_s(shMemName + "_s_ready")
 {
 }
+
+ProcCommunicator::ProcCommunicator(const std::string &shMemName,
+                                   std::unique_ptr<ISharedMemorySender> sender,
+                                   std::unique_ptr<ISharedMemoryReceiver> receiver)
+    : m_sender(std::move(sender)),
+      m_receiver(std::move(receiver)),
+      m_master_mem_name(shMemName + "_master"),
+      m_slave_mem_name(shMemName + "_slave"),
+      m_master_sent_s(shMemName + "_m_sent"),
+      m_slave_sent_s(shMemName + "_s_sent"),
+      m_slave_ready_s(shMemName + "_s_ready")
+{
+}
 ProcCommunicator::~ProcCommunicator()
 {
 #ifndef _WIN32

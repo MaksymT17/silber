@@ -2,12 +2,20 @@
 #include "SlotRegistry.h"
 #include <iostream>
 
-ClientProcCommunicator::ClientProcCommunicator(
-    const std::string &shMemName) : ProcCommunicator(shMemName)
+ClientProcCommunicator::ClientProcCommunicator(const std::string &shMemName)
+    : ClientProcCommunicator(
+          shMemName,
+          std::make_unique<SharedMemorySender>((shMemName + "_master").c_str()),
+          std::make_unique<SharedMemoryReceiver>((shMemName + "_slave").c_str()))
 {
-    m_sender = std::make_unique<SharedMemorySender>(m_master_mem_name.c_str());
-    m_receiver = std::make_unique<SharedMemoryReceiver>(m_slave_mem_name.c_str());
+}
 
+ClientProcCommunicator::ClientProcCommunicator(
+    const std::string &shMemName,
+    std::unique_ptr<ISharedMemorySender> sender,
+    std::unique_ptr<ISharedMemoryReceiver> receiver)
+    : ProcCommunicator(shMemName, std::move(sender), std::move(receiver))
+{
 #ifndef _WIN32
     m_master_sent = sem_open(m_master_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
     m_slave_sent = sem_open(m_slave_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);

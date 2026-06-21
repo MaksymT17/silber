@@ -30,11 +30,14 @@ class ProcCommunicator
 {
 protected:
     ProcCommunicator(const std::string &shMemName);
+    ProcCommunicator(const std::string &shMemName,
+                     std::unique_ptr<ISharedMemorySender> sender,
+                     std::unique_ptr<ISharedMemoryReceiver> receiver);
     virtual ~ProcCommunicator();
 
 protected:
-    std::unique_ptr<SharedMemorySender> m_sender;
-    std::unique_ptr<SharedMemoryReceiver> m_receiver;
+    std::unique_ptr<ISharedMemorySender> m_sender;
+    std::unique_ptr<ISharedMemoryReceiver> m_receiver;
 
     const std::string m_master_sent_s;
     const std::string m_slave_sent_s;

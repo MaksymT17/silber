@@ -1,11 +1,19 @@
 #include "ServerProcCommunicator.h"
 
-ServerProcCommunicator::ServerProcCommunicator(
-    const std::string &shMemName) : ProcCommunicator(shMemName)
+ServerProcCommunicator::ServerProcCommunicator(const std::string &shMemName)
+    : ServerProcCommunicator(
+          shMemName,
+          std::make_unique<SharedMemorySender>((shMemName + "_slave").c_str()),
+          std::make_unique<SharedMemoryReceiver>((shMemName + "_master").c_str()))
 {
-    m_sender = std::make_unique<SharedMemorySender>(m_slave_mem_name.c_str());
-    m_receiver = std::make_unique<SharedMemoryReceiver>(m_master_mem_name.c_str());
+}
 
+ServerProcCommunicator::ServerProcCommunicator(
+    const std::string &shMemName,
+    std::unique_ptr<ISharedMemorySender> sender,
+    std::unique_ptr<ISharedMemoryReceiver> receiver)
+    : ProcCommunicator(shMemName, std::move(sender), std::move(receiver))
+{
 #ifndef _WIN32
 
     // Unlink semaphores to ensure fresh initialization
@@ -38,7 +46,6 @@ ServerProcCommunicator::ServerProcCommunicator(
     }
 
 #endif
-
 }
 
 bool ServerProcCommunicator::isValid() const

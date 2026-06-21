@@ -10,6 +10,9 @@ class ClientProcCommunicator : public ProcCommunicator
 {
 public:
     ClientProcCommunicator(const std::string &shMemName);
+    ClientProcCommunicator(const std::string &shMemName,
+                           std::unique_ptr<ISharedMemorySender> sender,
+                           std::unique_ptr<ISharedMemoryReceiver> receiver);
     virtual ~ClientProcCommunicator();
 
     bool isValid() const;
