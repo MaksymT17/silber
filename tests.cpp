@@ -42,7 +42,7 @@ void run_test1_server() {
 void run_test1_client() {
     ClientProcCommunicator client(shared_mem_name);
     Message req(1, MessageType::HANDSHAKE);
-    Message *resp = nullptr;
+    const Message *resp = nullptr;
     
     bool ok = client.sendRequestGetResponse(&req, &resp);
     ASSERT_TRUE(ok);
@@ -90,7 +90,7 @@ void run_test2_server() {
 void run_test2_client(int id) {
     ClientProcCommunicator client(shared_mem_name);
     Message req(id, MessageType::HANDSHAKE);
-    Message *resp = nullptr;
+    const Message *resp = nullptr;
     
     bool ok = client.sendRequestGetResponse(&req, &resp);
     ASSERT_TRUE(ok);
@@ -148,7 +148,7 @@ void run_test3_server() {
 void run_test3_client() {
     ClientProcCommunicator client(shared_mem_name);
     Message req(1, MessageType::HANDSHAKE);
-    Message *resp = nullptr;
+    const Message *resp = nullptr;
     
     // Set a very short timeout (50ms)
     std::cout << "[Test 3] Calling sendRequestGetResponse with 50ms timeout..." << std::endl;
@@ -210,7 +210,7 @@ void run_test4_client() {
     ClientProcCommunicator client(shared_mem_name);
     // Send a message with ID = 100 (which is > MAX_CLIENTS_COUNT)
     Message req(100, MessageType::HANDSHAKE);
-    Message *resp = nullptr;
+    const Message *resp = nullptr;
     
     bool ok = client.sendRequestGetResponse(&req, &resp);
     ASSERT_TRUE(ok);

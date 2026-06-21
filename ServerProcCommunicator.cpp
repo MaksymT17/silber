@@ -84,16 +84,12 @@ void ServerProcCommunicator::send(const Message *msg)
 {
     m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
     sem_post(m_slave_sent);
-    sem_wait(m_master_received);
-    sem_post(m_slave_ready);
 }
 
 Message *ServerProcCommunicator::receive()
 {
     sem_wait(m_master_sent);
     Message *response = m_receiver->receiveMessage();
-    sem_post(m_slave_received);
-
     return response;
 }
 
@@ -102,8 +98,6 @@ void ServerProcCommunicator::send(const Message *msg)
 {
     m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
     ReleaseSemaphore(m_slave_sent, 1, NULL);
-    WaitForSingleObject(m_master_received, INFINITE);
-    ReleaseSemaphore(m_slave_ready, 1, NULL);
 }
 
 Message *ServerProcCommunicator::receive()
@@ -116,13 +110,6 @@ Message *ServerProcCommunicator::receive()
     }
 
     Message *response = m_receiver->receiveMessage();
-
-    BOOL releaseResult = ReleaseSemaphore(m_slave_received, 1, NULL);
-    if (!releaseResult)
-    {
-        std::cerr << "ProcCommunicator::receive ReleaseSemaphore FAIL\n";
-        return nullptr;
-    }
     return response;
 }
 
