@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)  # Turn off compiler-specific extensions
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
 
-ADD_LIBRARY(silber-1.2 STATIC
+ADD_LIBRARY(silber-2.0 STATIC
     SharedMemoryReceiver.cpp
     SharedMemorySender.cpp
     ProcCommunicator.cpp
@@ -18,8 +18,8 @@ ADD_LIBRARY(silber-1.2 STATIC
     SilberLogging.cpp)
 
 # install library if it is needed by multiple targets
-install(TARGETS silber-1.2
-EXPORT silber-1.2-config
+install(TARGETS silber-2.0
+EXPORT silber-2.0-config
  DESTINATION lib)
 
  install(FILES 
@@ -32,4 +32,4 @@ EXPORT silber-1.2-config
     SharedMemoryReceiver.h DESTINATION include)
 
 add_executable(silber_test tests.cpp)
-target_link_libraries(silber_test silber-1.2)
+target_link_libraries(silber_test silber-2.0)
