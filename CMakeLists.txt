@@ -27,5 +27,5 @@ EXPORT silber-1.2-config
     ProcCommunicator.h
     SharedMemoryReceiver.h DESTINATION include)
 
-add_executable(silber_test main.cpp)
+add_executable(silber_test tests.cpp)
 target_link_libraries(silber_test silber-1.2)
