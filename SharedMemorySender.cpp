@@ -1,4 +1,3 @@
-#include <iostream>
 #include <cstdlib>
 #include <cstring>
 #ifndef _WIN32
@@ -7,13 +6,18 @@
 #include <fcntl.h>
 #endif
 #include <string>
-#include <iostream>
 #include <exception>
 #include "SharedMemorySender.h"
+#include "SilberLogging.h"
 
 SharedMemorySender::SharedMemorySender(const char *shMemName) : m_name(shMemName)
 {
     init();
+}
+
+SharedMemorySender::~SharedMemorySender()
+{
+    finish();
 }
 #ifndef _WIN32
 void SharedMemorySender::init()
@@ -26,22 +30,25 @@ void SharedMemorySender::init()
             m_shm_fd = shm_open(m_name.c_str(), O_RDWR, 0666);
             if (m_shm_fd == -1)
             {
-                std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
-                exit(EXIT_FAILURE);
+                reportSilberError("SharedMemorySender::init shm_open failed");
+                m_ptr = nullptr;
+                return;
             }
         }
         else
         {
-            std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
-            exit(EXIT_FAILURE);
+            reportSilberError("SharedMemorySender::init shm_open failed");
+            m_ptr = nullptr;
+            return;
         }
     }
     else
     {
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
-            std::cerr << "SharedMemorySender::init ftruncate failed" << std::endl;
-            exit(EXIT_FAILURE);
+            reportSilberError("SharedMemorySender::init ftruncate failed");
+            m_ptr = nullptr;
+            return;
         }
     }
 
@@ -49,25 +56,28 @@ void SharedMemorySender::init()
     m_ptr = mmap(0, SHARED_MEMORY_SIZE, PROT_WRITE, MAP_SHARED, m_shm_fd, 0);
     if (m_ptr == MAP_FAILED)
     {
-        std::cerr << "mmap failed" << std::endl;
-        throw std::exception();
+        reportSilberError("mmap failed");
+        m_ptr = nullptr;
     }
 }
 
 void SharedMemorySender::finish()
 {
-    if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+    if (m_ptr && m_ptr != (void*)-1 && m_ptr != MAP_FAILED)
     {
-        std::cerr << "munmap failed" << std::endl;
+        if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+        {
+            reportSilberError("munmap failed");
+        }
+        m_ptr = nullptr;
     }
-    if (close(m_shm_fd) == -1)
+    if (m_shm_fd != -1)
     {
-        std::cerr << "close failed" << std::endl;
-    }
-
-    if (shm_unlink(m_name.c_str()) == -1)
-    {
-        std::cerr << "shm_unlink failed" << std::endl;
+        if (close(m_shm_fd) == -1)
+        {
+            reportSilberError("close failed");
+        }
+        m_shm_fd = -1;
     }
 }
 
@@ -84,22 +94,29 @@ void SharedMemorySender::init()
 
     if (m_shm_fd == NULL)
     {
-        printf("Could not create file mapping object (%d).\n",
-               GetLastError());
+        reportSilberError("Could not create file mapping object (%d).", GetLastError());
     }
     m_ptr = (void *)MapViewOfFile(m_shm_fd, FILE_MAP_ALL_ACCESS, 0, 0, SHARED_MEMORY_SIZE);
 
     if (m_ptr == NULL)
     {
-        printf("Could not map view of file (%d).\n", GetLastError());
+        reportSilberError("Could not map view of file (%d).", GetLastError());
         CloseHandle(m_shm_fd);
     }
 }
 
 void SharedMemorySender::finish()
 {
-    UnmapViewOfFile(m_ptr);
-    CloseHandle(m_shm_fd);
+    if (m_ptr)
+    {
+        UnmapViewOfFile(m_ptr);
+        m_ptr = nullptr;
+    }
+    if (m_shm_fd != NULL)
+    {
+        CloseHandle(m_shm_fd);
+        m_shm_fd = NULL;
+    }
 }
 
 void SharedMemorySender::sendMessage(const Message *msg, const size_t offset)

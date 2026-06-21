@@ -1,129 +1,111 @@
 #include "ServerProcCommunicator.h"
+#include "OSSemaphore.h"
+#include "SilberLogging.h"
+
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
+ServerProcCommunicator::ServerProcCommunicator(const std::string &shMemName)
+    : ServerProcCommunicator(
+          shMemName,
+          std::make_unique<SharedMemorySender>((shMemName + "_slave").c_str()),
+          std::make_unique<SharedMemoryReceiver>((shMemName + "_master").c_str()))
+{
+}
 
 ServerProcCommunicator::ServerProcCommunicator(
-    const std::string &shMemName) : ProcCommunicator(shMemName)
+    const std::string &shMemName,
+    std::unique_ptr<ISharedMemorySender> sender,
+    std::unique_ptr<ISharedMemoryReceiver> receiver)
+    : ProcCommunicator(shMemName, std::move(sender), std::move(receiver))
 {
-    m_sender = std::make_unique<SharedMemorySender>(m_slave_mem_name.c_str());
-    m_receiver = std::make_unique<SharedMemoryReceiver>(m_master_mem_name.c_str());
-
-#ifndef _WIN32
-
     // Unlink semaphores to ensure fresh initialization
-    sem_unlink(m_master_received_s.c_str());
-    sem_unlink(m_slave_received_s.c_str());
-    sem_unlink(m_master_sent_s.c_str());
-    sem_unlink(m_slave_sent_s.c_str());
-    sem_unlink(m_slave_ready_s.c_str());
+    OSSemaphore::unlink(m_master_sent_s);
+    OSSemaphore::unlink(m_slave_sent_s);
+    OSSemaphore::unlink(m_slave_ready_s);
 
     // Create semaphores with desired initial values
-    m_master_received = sem_open(m_master_received_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_received = sem_open(m_slave_received_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_master_sent = sem_open(m_master_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_sent = sem_open(m_slave_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_ready = sem_open(m_slave_ready_s.c_str(), O_CREAT, 0666, N_SEM_ON);
+    m_master_sent = std::make_unique<OSSemaphore>(m_master_sent_s, true, N_SEM_OFF);
+    m_slave_sent = std::make_unique<OSSemaphore>(m_slave_sent_s, true, N_SEM_OFF);
+    m_slave_ready = std::make_unique<OSSemaphore>(m_slave_ready_s, true, N_SEM_ON);
 
-    if (m_master_received == SEM_FAILED || m_slave_received == SEM_FAILED ||
-        m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED)
+    if (!m_master_sent->isValid() || !m_slave_sent->isValid() || !m_slave_ready->isValid())
     {
-        perror("sem_open failure");
-        exit(EXIT_FAILURE);
+        reportSilberError("ProcCommunicator sem_open failure.");
     }
 
-#else
-
-    std::wstring wshMemName(shMemName.begin(), shMemName.end());
-
-    // Create semaphores with desired initial values
-    m_master_received = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_m_rsem").c_str());
-    m_slave_received = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_s_rsem").c_str());
-    m_master_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_m_sent").c_str());
-    m_slave_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_s_sent").c_str());
-    m_slave_ready = CreateSemaphoreW(NULL, N_SEM_ON, MAXLONG, (wshMemName + L"_s_ready").c_str());
-
-    if (!m_master_received || !m_slave_received || !m_master_sent || !m_slave_sent || !m_slave_ready)
+    // Initialize/reset ClientSlotRegistry on startup to prevent stale process IDs
+    if (m_receiver && m_receiver->isValid())
     {
-        std::cerr << "CreateSemaphore failure, error: " << GetLastError() << '\n';
-        exit(EXIT_FAILURE);
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+        if (registry)
+        {
+            for (size_t i = 0; i < MAX_CLIENTS_COUNT; ++i)
+            {
+                registry->slot_pids[i].store(0);
+            }
+            registry->active_slot.store(-1);
+        }
     }
-
-#endif
-
 }
+
+bool ServerProcCommunicator::isValid() const
+{
+    if (!m_sender || !m_receiver || !m_sender->isValid() || !m_receiver->isValid())
+    {
+        return false;
+    }
+    return m_master_sent && m_slave_sent && m_slave_ready &&
+           m_master_sent->isValid() && m_slave_sent->isValid() && m_slave_ready->isValid();
+}
+
 ServerProcCommunicator::~ServerProcCommunicator()
 {
+    OSSemaphore::unlink(m_master_sent_s);
+    OSSemaphore::unlink(m_slave_sent_s);
+    OSSemaphore::unlink(m_slave_ready_s);
+
 #ifndef _WIN32
-    if (sem_unlink(m_master_received_s.c_str()) == -1)
-    {
-        std::cerr <<"Failed to unlink m_master_received semaphore\n";
-    }
-
-    if (sem_unlink(m_slave_received_s.c_str()) == -1)
-    {
-        std::cerr <<"Failed to unlink m_slave_received semaphore\n";
-    }
-
-    if (sem_unlink(m_master_sent_s.c_str()) == -1)
-    {
-        std::cerr <<"Failed to unlink m_master_sent semaphore\n";
-    }
-
-    if (sem_unlink(m_slave_sent_s.c_str()) == -1)
-    {
-        std::cerr <<"Failed to unlink m_slave_sent semaphore\n";
-    }
-
-    if (sem_unlink(m_slave_ready_s.c_str()) == -1)
-    {
-        std::cerr <<"Failed to unlink m_slave_ready semaphore\n";
-    }
+    shm_unlink(m_master_mem_name.c_str());
+    shm_unlink(m_slave_mem_name.c_str());
 #endif
 }
-#ifndef _WIN32
 
 void ServerProcCommunicator::send(const Message *msg)
 {
-    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
-    sem_post(m_slave_sent);
-    sem_wait(m_master_received);
-    sem_post(m_slave_ready);
+    if (!isValid()) return;
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
+
+    m_sender->sendMessage(msg, CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
+    m_slave_sent->post();
 }
 
 Message *ServerProcCommunicator::receive()
 {
-    sem_wait(m_master_sent);
-    Message *response = m_receiver->receiveMessage();
-    sem_post(m_slave_received);
-
-    return response;
-}
-
-#else
-void ServerProcCommunicator::send(const Message *msg)
-{
-    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
-    ReleaseSemaphore(m_slave_sent, 1, NULL);
-    WaitForSingleObject(m_master_received, INFINITE);
-    ReleaseSemaphore(m_slave_ready, 1, NULL);
-}
-
-Message *ServerProcCommunicator::receive()
-{
-    DWORD waitResult = WaitForSingleObject(m_master_sent, INFINITE);
-    if (waitResult != WAIT_OBJECT_0)
+    if (!isValid()) return nullptr;
+    
+    // Adaptive spin wait
+    bool acquired = false;
+    for (int spin = 0; spin < 4000; ++spin)
     {
-        std::cerr << "ProcCommunicator::receive WaitForSingleObject FAIL\n";
-        return nullptr;
+        if (m_master_sent->tryWait())
+        {
+            acquired = true;
+            break;
+        }
+        cpu_yield();
+    }
+    if (!acquired)
+    {
+        m_master_sent->wait();
     }
 
-    Message *response = m_receiver->receiveMessage();
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
 
-    BOOL releaseResult = ReleaseSemaphore(m_slave_received, 1, NULL);
-    if (!releaseResult)
-    {
-        std::cerr << "ProcCommunicator::receive ReleaseSemaphore FAIL\n";
-        return nullptr;
-    }
+    Message *response = m_receiver->receiveMessage(CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
     return response;
 }
-
-#endif

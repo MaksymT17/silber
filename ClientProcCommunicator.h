@@ -10,136 +10,125 @@ class ClientProcCommunicator : public ProcCommunicator
 {
 public:
     ClientProcCommunicator(const std::string &shMemName);
+    ClientProcCommunicator(const std::string &shMemName,
+                           std::unique_ptr<ISharedMemorySender> sender,
+                           std::unique_ptr<ISharedMemoryReceiver> receiver);
+    virtual ~ClientProcCommunicator();
 
-    virtual ~ClientProcCommunicator() = default;
+    bool isValid() const;
 
-#ifndef _WIN32
-    /// note: blocking call, which will wait until server will repsond
-    template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response **reponse)
+    void sem_wait_adaptive(ISemaphore *sem)
     {
-        bool result{true};
-        sem_wait(m_slave_ready);
-        m_sender->sendMessage(request);
-        sem_post(m_master_sent);
-        sem_wait(m_slave_received);
-        sem_wait(m_slave_sent);
-
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
-
-        if (repsonsePtr)
+        for (int spin = 0; spin < 4000; ++spin)
         {
-            *reponse = repsonsePtr;
-        }
-        else
-        {
-            std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
-            result = false;
-        }
-        sem_post(m_master_received);
-        return result;
-    }
-
-    /// note: non-blocking call, if response will be not provided method returns false.
-    // Real-time computing implementation. User can skip Server answer if it is too late.
-    // Next request could be sent instead.
-    // Calculation time is not included in timeout_ms. Calculations timeout can be set via configuration.
-    template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
-    {
-        bool is_slave_ready{false};
-        for (size_t i = 0; i <= timeout_ms; i += WAIT_POLL_PERIOD)
-        {
-            if (sem_trywait(m_slave_ready) == 0)
+            if (sem->tryWait())
             {
-                is_slave_ready = true;
-                break;
+                return;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(WAIT_POLL_PERIOD));
+            cpu_yield();
         }
-        if (!is_slave_ready)
-        {
-            printf("is_slave_ready is not ready after the requested timeout %zu\n", timeout_ms);
-            // release all semaphores, even if server respond later - it will be out of requested timebox
-            sem_post(m_master_sent);
-            sem_post(m_master_received);
-            return false;
-        }
-        m_sender->sendMessage(request);
-        sem_post(m_master_sent);
-        sem_wait(m_slave_received);
-        sem_wait(m_slave_sent);
-
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
-
-        if (repsonsePtr)
-            *reponse = repsonsePtr;
-        else
-            std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
-
-        sem_post(m_master_received);
-        return true;
+        sem->wait();
     }
 
-#else
-    template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response **reponse)
+    bool sem_wait_timeout_adaptive(ISemaphore *sem, size_t timeout_ms)
     {
-        bool result{true};
-        WaitForSingleObject(m_slave_ready, INFINITE);
-
-        m_sender->sendMessage(request);
-        ReleaseSemaphore(m_master_sent, 1, NULL);
-        WaitForSingleObject(m_slave_received, INFINITE);
-        WaitForSingleObject(m_slave_sent, INFINITE);
-
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
-
-        if (repsonsePtr)
+        for (int spin = 0; spin < 2000; ++spin)
         {
-            *reponse = repsonsePtr;
+            if (sem->tryWait())
+            {
+                return true;
+            }
+            cpu_yield();
         }
-        else
-        {
-            std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
-            result = false;
-        }
-
-        ReleaseSemaphore(m_master_received, 1, NULL);
-        return result;
+        return sem->waitTimeout(timeout_ms);
     }
+
     template <typename Response>
-    bool sendRequestGetResponse(const Message *request, Response **reponse, size_t timeout_ms)
+    bool sendRequestGetResponse(const Message *request, const Response **response)
     {
-        DWORD result = WaitForSingleObject(m_slave_ready, timeout_ms);
-        bool r_result{true};
-        if (result == WAIT_TIMEOUT || result != WAIT_OBJECT_0)
+        if (!isValid())
         {
-            std::cout << "is_slave_ready is not ready after the requested timeout: " << timeout_ms << std::endl;
-            ReleaseSemaphore(m_master_sent, 1, NULL);
-            ReleaseSemaphore(m_master_received, 1, NULL);
             return false;
         }
 
-        m_sender->sendMessage(request);
-        ReleaseSemaphore(m_master_sent, 1, NULL);
-        WaitForSingleObject(m_slave_received, INFINITE);
-        WaitForSingleObject(m_slave_sent, INFINITE);
+        sem_wait_adaptive(m_slave_ready.get());
+        
+        // Drain any stale response signals
+        while (m_slave_sent->tryWait()) {}
 
-        Response *repsonsePtr = static_cast<Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
+        m_master_sent->post();
+        sem_wait_adaptive(m_slave_sent.get());
+
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
         {
-            *reponse = repsonsePtr;
+            *response = repsonsePtr;
+            m_slave_ready->post();
+            return true;
         }
-        else
+        
+        m_slave_ready->post();
+        return false;
+    }
+
+    template <typename Response>
+    bool sendRequestGetResponse(const Message *request, const Response **response, size_t timeout_ms)
+    {
+        if (!isValid())
         {
-            std::cerr << "ClientProcCommunicator::sendRequestGetResponse response type is not expected\n";
-            r_result = false;
+            return false;
         }
 
-        ReleaseSemaphore(m_master_received, 1, NULL);
-        return r_result;
+        auto start = std::chrono::steady_clock::now();
+        if (!sem_wait_timeout_adaptive(m_slave_ready.get(), timeout_ms))
+        {
+            return false;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+        if (elapsed >= (long long)timeout_ms)
+        {
+            m_slave_ready->post();
+            return false;
+        }
+        size_t remaining = timeout_ms - elapsed;
+
+        // Drain any stale response signals
+        while (m_slave_sent->tryWait()) {}
+
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
+        m_master_sent->post();
+
+        if (!sem_wait_timeout_adaptive(m_slave_sent.get(), remaining))
+        {
+            m_slave_ready->post();
+            return false;
+        }
+
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
+
+        if (repsonsePtr)
+        {
+            *response = repsonsePtr;
+            m_slave_ready->post();
+            return true;
+        }
+        
+        m_slave_ready->post();
+        return false;
     }
-#endif
+
+private:
+    int m_slot_index{-1};
 };

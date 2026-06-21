@@ -1,38 +1,64 @@
 #include "ClientProcCommunicator.h"
+#include "OSSemaphore.h"
+#include "SlotRegistry.h"
+#include "SilberLogging.h"
+
+ClientProcCommunicator::ClientProcCommunicator(const std::string &shMemName)
+    : ClientProcCommunicator(
+          shMemName,
+          std::make_unique<SharedMemorySender>((shMemName + "_master").c_str()),
+          std::make_unique<SharedMemoryReceiver>((shMemName + "_slave").c_str()))
+{
+}
 
 ClientProcCommunicator::ClientProcCommunicator(
-    const std::string &shMemName) : ProcCommunicator(shMemName)
+    const std::string &shMemName,
+    std::unique_ptr<ISharedMemorySender> sender,
+    std::unique_ptr<ISharedMemoryReceiver> receiver)
+    : ProcCommunicator(shMemName, std::move(sender), std::move(receiver))
 {
-    m_sender = std::make_unique<SharedMemorySender>(m_master_mem_name.c_str());
-    m_receiver = std::make_unique<SharedMemoryReceiver>(m_slave_mem_name.c_str());
+    m_master_sent = std::make_unique<OSSemaphore>(m_master_sent_s, true, N_SEM_OFF);
+    m_slave_sent = std::make_unique<OSSemaphore>(m_slave_sent_s, true, N_SEM_OFF);
+    m_slave_ready = std::make_unique<OSSemaphore>(m_slave_ready_s, true, N_SEM_ON);
 
-#ifndef _WIN32
-    m_master_received = sem_open(m_master_received_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_received = sem_open(m_slave_received_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_master_sent = sem_open(m_master_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_sent = sem_open(m_slave_sent_s.c_str(), O_CREAT, 0666, N_SEM_OFF);
-    m_slave_ready = sem_open(m_slave_ready_s.c_str(), O_CREAT, 0666, N_SEM_ON);
-
-    if (m_master_received == SEM_FAILED || m_slave_received == SEM_FAILED ||
-        m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED || m_slave_ready == SEM_FAILED)
+    if (!m_master_sent->isValid() || !m_slave_sent->isValid() || !m_slave_ready->isValid())
     {
-        std::cerr << "ProcCommunicator sem_open failure.\n";
-        exit(1);
+        reportSilberError("ProcCommunicator sem_open failure.");
     }
-#else
-    std::wstring wshMemName(shMemName.begin(), shMemName.end());
 
-    m_master_received = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_m_rsem").c_str());
-    m_slave_received = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_s_rsem").c_str());
-    m_master_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_m_sent").c_str());
-    m_slave_sent = CreateSemaphoreW(NULL, N_SEM_OFF, MAXLONG, (wshMemName + L"_s_sent").c_str());
-    m_slave_ready = CreateSemaphoreW(NULL, N_SEM_ON, MAXLONG, (wshMemName + L"_s_ready").c_str());
-
-    if (m_master_received == NULL || m_slave_received == NULL ||
-        m_master_sent == NULL || m_slave_sent == NULL || m_slave_ready == NULL)
+    // Dynamic slot allocation
+    m_slot_index = -1;
+    if (m_sender && m_sender->isValid())
     {
-        std::cerr << "ProcCommunicator sem_open failure.\n";
-        exit(1);
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        m_slot_index = SlotRegistry::claimSlot(registry);
     }
-#endif
+
+    if (m_slot_index == -1)
+    {
+        reportSilberError("ClientProcCommunicator warning: all communication slots are occupied or initialization failed.");
+    }
+}
+
+bool ClientProcCommunicator::isValid() const
+{
+    if (m_slot_index == -1)
+    {
+        return false;
+    }
+    if (!m_sender || !m_receiver || !m_sender->isValid() || !m_receiver->isValid())
+    {
+        return false;
+    }
+    return m_master_sent && m_slave_sent && m_slave_ready &&
+           m_master_sent->isValid() && m_slave_sent->isValid() && m_slave_ready->isValid();
+}
+
+ClientProcCommunicator::~ClientProcCommunicator()
+{
+    if (m_slot_index != -1 && m_sender && m_sender->isValid())
+    {
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        SlotRegistry::releaseSlot(registry, m_slot_index);
+    }
 }

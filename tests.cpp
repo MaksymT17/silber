@@ -1,0 +1,585 @@
+#include "ProcCommunicator.h"
+#include "ServerProcCommunicator.h"
+#include "ClientProcCommunicator.h"
+#include "SilberLogging.h"
+#include <iostream>
+#include <cstring>
+
+static void test_error_callback(const char *message) {
+    std::cerr << "[TESTS ERROR LOGGER]: " << message << std::endl;
+}
+#include <thread>
+#include <chrono>
+#include <cassert>
+#ifndef _WIN32
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+#include <csignal>
+
+#ifdef __APPLE__
+#include <mach/thread_act.h>
+#include <mach/thread_policy.h>
+#include <mach/mach_init.h>
+inline void pin_to_core(int core_id) {
+    thread_affinity_policy_data_t policy = { core_id };
+    thread_policy_set(mach_thread_self(), THREAD_AFFINITY_POLICY, (thread_policy_t)&policy, THREAD_AFFINITY_POLICY_COUNT);
+}
+#elif !defined(_WIN32)
+#include <pthread.h>
+inline void pin_to_core(int core_id) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
+#else
+inline void pin_to_core(int core_id) {}
+#endif
+
+static const std::string shared_mem_name{"/shm_test_suite"};
+
+#define ASSERT_TRUE(x) do { \
+    if (!(x)) { \
+        std::cerr << "Assertion failed: " << #x << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        std::exit(1); \
+    } \
+} while(0)
+
+struct Configuration
+{
+    size_t AffinityThreshold;
+    size_t MinPixelsForObject;
+    uint8_t PixelStep;
+    double CalculationTimeLimit;
+    size_t IdleTimeout;
+    double ThreadsMultiplier;
+};
+
+struct MessageSetConfig : public Message
+{
+    MessageSetConfig() : Message()
+    {
+        size = sizeof(MessageSetConfig);
+        type = MessageType::SET_CONFIG;
+    }
+    Configuration configuration;
+};
+
+struct MessageCompareRequest : public Message
+{
+    MessageCompareRequest() : Message()
+    {
+        size = sizeof(MessageCompareRequest);
+        type = MessageType::COMPARE_REQUEST;
+    }
+    char base[200];
+    char to_compare[200];
+};
+
+struct Rect
+{
+    size_t l, r, t, b;
+};
+
+struct MessageCompareResult : public Message
+{
+    MessageCompareResult() : Message()
+    {
+        size = sizeof(MessageCompareResult);
+        type = MessageType::COMPARE_RESULT;
+    }
+    Rect payload[100];
+    size_t payload_bytes;
+};
+
+// Helper to run a watchdog timer
+void setup_watchdog(int seconds) {
+#ifndef _WIN32
+    alarm(seconds);
+#endif
+}
+
+void cancel_watchdog() {
+#ifndef _WIN32
+    alarm(0);
+#endif
+}
+
+// TEST 1: Single Client-Server Roundtrip (Blocking IPC)
+void run_test1_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    Message *req = server.receive();
+    if (req) {
+        Message resp(req->id, MessageType::HANDSHAKE_OK);
+        server.send(&resp);
+    }
+}
+
+void run_test1_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    Message req(1, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(resp != nullptr);
+    ASSERT_TRUE(resp->id == 1);
+    ASSERT_TRUE(resp->type == MessageType::HANDSHAKE_OK);
+}
+
+void test1_single_roundtrip() {
+    std::cout << "[Test 1] Starting Single Client-Server Roundtrip (Blocking IPC)..." << std::endl;
+#ifndef _WIN32
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        std::exit(1);
+    }
+    if (pid == 0) {
+        // Child: Server
+        run_test1_server();
+        std::exit(0);
+    } else {
+        // Parent: Client
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait for server to init
+        setup_watchdog(5); // 5 seconds watchdog
+        run_test1_client();
+        cancel_watchdog();
+        int status;
+        waitpid(pid, &status, 0);
+        std::cout << "[Test 1] PASSED" << std::endl;
+    }
+#else
+    std::thread server_thread(run_test1_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    run_test1_client();
+    server_thread.join();
+    std::cout << "[Test 1] PASSED" << std::endl;
+#endif
+}
+
+// TEST 2: Multi-Client Concurrency Simulation
+void run_test2_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    // Handle 5 requests
+    for (int i = 0; i < 5; ++i) {
+        Message *req = server.receive();
+        if (req) {
+            Message resp(req->id, MessageType::HANDSHAKE_OK);
+            server.send(&resp);
+        }
+    }
+}
+
+void run_test2_client(int id) {
+    ClientProcCommunicator client(shared_mem_name);
+    Message req(id, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(resp != nullptr);
+    ASSERT_TRUE(resp->id == id);
+    ASSERT_TRUE(resp->type == MessageType::HANDSHAKE_OK);
+}
+
+void test2_multi_client() {
+    std::cout << "[Test 2] Starting Multi-Client Concurrency..." << std::endl;
+#ifndef _WIN32
+    pid_t server_pid = fork();
+    if (server_pid == 0) {
+        run_test2_server();
+        std::exit(0);
+    }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    setup_watchdog(10);
+    
+    pid_t client_pids[5];
+    for (int i = 0; i < 5; ++i) {
+        pid_t c_pid = fork();
+        if (c_pid == 0) {
+            run_test2_client(i + 1); // ID 1 to 5
+            std::exit(0);
+        }
+        client_pids[i] = c_pid;
+    }
+    
+    // Wait for all clients
+    for (int i = 0; i < 5; ++i) {
+        int status;
+        waitpid(client_pids[i], &status, 0);
+        ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    }
+    
+    int server_status;
+    waitpid(server_pid, &server_status, 0);
+    cancel_watchdog();
+    std::cout << "[Test 2] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test2_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    std::thread client_threads[5];
+    for (int i = 0; i < 5; ++i) {
+        client_threads[i] = std::thread(run_test2_client, i + 1);
+    }
+    for (int i = 0; i < 5; ++i) {
+        client_threads[i].join();
+    }
+    server_thread.join();
+    std::cout << "[Test 2] PASSED" << std::endl;
+#endif
+}
+
+// TEST 3: Non-Blocking Timeout Behavior
+void run_test3_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    // Server sleeps before responding to simulate slow calculation / delay
+    Message *req = server.receive();
+    if (req) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(300));
+        Message resp(req->id, MessageType::HANDSHAKE_OK);
+        server.send(&resp);
+    }
+}
+
+void run_test3_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    Message req(1, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    // Set a very short timeout (50ms)
+    std::cout << "[Test 3] Calling sendRequestGetResponse with 50ms timeout..." << std::endl;
+    auto start = std::chrono::steady_clock::now();
+    bool ok = client.sendRequestGetResponse(&req, &resp, 50);
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    std::cout << "[Test 3] Call returned after " << elapsed << " ms. Success=" << ok << std::endl;
+    
+    // The call should fail due to timeout
+    ASSERT_TRUE(!ok);
+}
+
+void test3_timeout() {
+    std::cout << "[Test 3] Starting Non-Blocking Timeout Test..." << std::endl;
+#ifndef _WIN32
+    pid_t server_pid = fork();
+    if (server_pid == 0) {
+        run_test3_server();
+        std::exit(0);
+    }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // We expect the client to timeout. However, due to Bug A, it will likely block forever.
+    // So we set a watchdog to abort the test if it hangs for more than 3 seconds.
+    setup_watchdog(3);
+    
+    pid_t client_pid = fork();
+    if (client_pid == 0) {
+        run_test3_client();
+        std::exit(0);
+    }
+    
+    int client_status;
+    waitpid(client_pid, &client_status, 0);
+    cancel_watchdog();
+    
+    // Kill server if it's still running
+    kill(server_pid, SIGKILL);
+    int status;
+    waitpid(server_pid, &status, 0);
+    
+    ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
+    std::cout << "[Test 3] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test3_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_test3_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Test 3] PASSED" << std::endl;
+#endif
+}
+
+// TEST 4: Dynamic Transaction ID Stress (Large ID value)
+void run_test4_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    Message *req = server.receive();
+    if (req) {
+        Message resp(req->id, MessageType::HANDSHAKE_OK);
+        server.send(&resp);
+    }
+}
+
+void run_test4_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    // Send a message with ID = 100 (which is > MAX_CLIENTS_COUNT)
+    Message req(100, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(resp != nullptr);
+    ASSERT_TRUE(resp->id == 100);
+}
+
+void test4_large_id() {
+    std::cout << "[Test 4] Starting Large Transaction ID Test..." << std::endl;
+#ifndef _WIN32
+    pid_t server_pid = fork();
+    if (server_pid == 0) {
+        run_test4_server();
+        std::exit(0);
+    }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    setup_watchdog(3);
+    
+    pid_t client_pid = fork();
+    if (client_pid == 0) {
+        run_test4_client();
+        std::exit(0);
+    }
+    
+    int client_status;
+    waitpid(client_pid, &client_status, 0);
+    cancel_watchdog();
+    
+    kill(server_pid, SIGKILL);
+    int status;
+    waitpid(server_pid, &status, 0);
+    
+    ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
+    std::cout << "[Test 4] PASSED" << std::endl;
+#else
+    std::thread server_thread(run_test4_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_test4_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Test 4] PASSED" << std::endl;
+#endif
+}
+
+// TEST 5: Graceful Error Handling (No Exceptions / No Exit)
+void test5_error_handling() {
+    std::cout << "[Test 5] Starting Graceful Error Handling (No Exceptions / No Exit)..." << std::endl;
+    setup_watchdog(3);
+
+    // Suppress logging during this test as these errors are expected
+    setSilberErrorCallback(nullptr);
+
+    // Initialize with a name that is too long to trigger errors in shm_open / CreateFileMapping
+    std::string long_name(35000, 'A');
+    ClientProcCommunicator client(long_name);
+    ASSERT_TRUE(!client.isValid());
+
+    ServerProcCommunicator server(long_name);
+    ASSERT_TRUE(!server.isValid());
+
+    // Verify calls on invalid communicators do not crash/throw and return false/nullptr
+    const Message *resp = nullptr;
+    Message req(1, MessageType::HANDSHAKE);
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(!ok);
+
+    Message *incoming = server.receive();
+    ASSERT_TRUE(incoming == nullptr);
+
+    // Restore logger callback
+    setSilberErrorCallback(test_error_callback);
+
+    cancel_watchdog();
+    std::cout << "[Test 5] PASSED" << std::endl;
+}
+
+// TEST 6: Performance Benchmark
+void run_benchmark_server() {
+    pin_to_core(1);
+    ServerProcCommunicator server(shared_mem_name);
+    for (int i = 0; i < 100000; ++i) {
+        Message *req = server.receive();
+        if (req) {
+            Message resp(req->id, MessageType::HANDSHAKE_OK);
+            server.send(&resp);
+        }
+    }
+}
+
+void run_benchmark_client() {
+    pin_to_core(2);
+    ClientProcCommunicator client(shared_mem_name);
+    Message req(1, MessageType::HANDSHAKE);
+    const Message *resp = nullptr;
+    
+    auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < 100000; ++i) {
+        bool ok = client.sendRequestGetResponse(&req, &resp);
+        ASSERT_TRUE(ok);
+    }
+    auto end = std::chrono::steady_clock::now();
+    auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    
+    std::cout << "[Benchmark] 100,000 round-trips completed." << std::endl;
+    std::cout << "[Benchmark] Total Time: " << elapsed_ms << " ms" << std::endl;
+    std::cout << "[Benchmark] Latency: " << (elapsed_ms * 1000.0 / 100000.0) << " microseconds / round-trip" << std::endl;
+    std::cout << "[Benchmark] Throughput: " << (100000.0 / (elapsed_ms / 1000.0)) << " round-trips / sec" << std::endl;
+}
+
+// TEST 6: OCP - User-defined/Extended Messages
+void run_test6_server() {
+    ServerProcCommunicator server(shared_mem_name);
+    Message *req = server.receive();
+    if (req && req->type == MessageType::COMPARE_REQUEST) {
+        const MessageCompareRequest *comp_req = static_cast<const MessageCompareRequest*>(req);
+        ASSERT_TRUE(std::string(comp_req->base) == "base_image.png");
+        ASSERT_TRUE(std::string(comp_req->to_compare) == "target_image.png");
+
+        MessageCompareResult resp;
+        resp.id = req->id;
+        resp.payload_bytes = sizeof(Rect) * 2;
+        resp.payload[0] = {10, 20, 30, 40};
+        resp.payload[1] = {50, 60, 70, 80};
+        server.send(&resp);
+    }
+}
+
+void run_test6_client() {
+    ClientProcCommunicator client(shared_mem_name);
+    MessageCompareRequest req;
+    req.id = 6;
+    std::strcpy(req.base, "base_image.png");
+    std::strcpy(req.to_compare, "target_image.png");
+
+    const MessageCompareResult *resp = nullptr;
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(resp != nullptr);
+    ASSERT_TRUE(resp->id == 6);
+    ASSERT_TRUE(resp->type == MessageType::COMPARE_RESULT);
+    ASSERT_TRUE(resp->payload_bytes == sizeof(Rect) * 2);
+    ASSERT_TRUE(resp->payload[0].l == 10);
+    ASSERT_TRUE(resp->payload[0].r == 20);
+    ASSERT_TRUE(resp->payload[1].l == 50);
+    ASSERT_TRUE(resp->payload[1].b == 80);
+}
+
+void test6_ocp_custom_messages() {
+    std::cout << "[Test 6] Starting OCP Custom Messages (Extended Payloads)..." << std::endl;
+#ifndef _WIN32
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        std::exit(1);
+    }
+    if (pid == 0) {
+        run_test6_server();
+        std::exit(0);
+    } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        setup_watchdog(5);
+        run_test6_client();
+        cancel_watchdog();
+        int status;
+        waitpid(pid, &status, 0);
+        std::cout << "[Test 6] PASSED" << std::endl;
+    }
+#else
+    std::thread server_thread(run_test6_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    run_test6_client();
+    server_thread.join();
+    std::cout << "[Test 6] PASSED" << std::endl;
+#endif
+}
+
+void test_performance_benchmark() {
+    std::cout << "[Benchmark] Starting Performance Benchmark (100,000 round-trips)..." << std::endl;
+#ifndef _WIN32
+    pid_t server_pid = fork();
+    if (server_pid == 0) {
+        run_benchmark_server();
+        std::exit(0);
+    }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    setup_watchdog(30); // 30 seconds watchdog
+    
+    pid_t client_pid = fork();
+    if (client_pid == 0) {
+        run_benchmark_client();
+        std::exit(0);
+    }
+    
+    int client_status;
+    waitpid(client_pid, &client_status, 0);
+    cancel_watchdog();
+    
+    kill(server_pid, SIGKILL);
+    int status;
+    waitpid(server_pid, &status, 0);
+    
+    ASSERT_TRUE(WIFEXITED(client_status) && WEXITSTATUS(client_status) == 0);
+    std::cout << "[Benchmark] Completed successfully." << std::endl;
+#else
+    std::thread server_thread(run_benchmark_server);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    std::thread client_thread(run_benchmark_client);
+    client_thread.join();
+    server_thread.join();
+    std::cout << "[Benchmark] Completed successfully." << std::endl;
+#endif
+}
+
+int main() {
+    // Set custom error callback to verify redirection
+    setSilberErrorCallback(test_error_callback);
+
+#ifndef _WIN32
+    // Clean up any stale shared memory and semaphores from previous runs
+    shm_unlink("/shm_test_suite_master");
+    shm_unlink("/shm_test_suite_slave");
+    sem_unlink("/shm_test_suite_m_sent");
+    sem_unlink("/shm_test_suite_s_sent");
+    sem_unlink("/shm_test_suite_s_ready");
+
+    // Watchdog signal handler to catch deadlock hangs
+    signal(SIGALRM, [](int sig) {
+        std::cerr << "\n!!! WATCHDOG TIMEOUT: Test deadlocked or took too long !!!" << std::endl;
+        std::exit(1);
+    });
+#endif
+
+    test1_single_roundtrip();
+    std::cout << "------------------------------------------" << std::endl;
+    
+    test2_multi_client();
+    std::cout << "------------------------------------------" << std::endl;
+    
+    test3_timeout();
+    std::cout << "------------------------------------------" << std::endl;
+    
+    test4_large_id();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test5_error_handling();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test6_ocp_custom_messages();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test_performance_benchmark();
+    std::cout << "------------------------------------------" << std::endl;
+    
+    std::cout << "ALL TESTS COMPLETED" << std::endl;
+    return 0;
+}
