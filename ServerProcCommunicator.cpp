@@ -51,6 +51,20 @@ ServerProcCommunicator::ServerProcCommunicator(
     }
 
 #endif
+
+    // Initialize/reset ClientSlotRegistry on startup to prevent stale process IDs
+    if (m_receiver && m_receiver->isValid())
+    {
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+        if (registry)
+        {
+            for (size_t i = 0; i < MAX_CLIENTS_COUNT; ++i)
+            {
+                registry->slot_pids[i].store(0);
+            }
+            registry->active_slot.store(-1);
+        }
+    }
 }
 
 bool ServerProcCommunicator::isValid() const

@@ -57,7 +57,7 @@ void SharedMemoryReceiver::init()
         }
     }
 
-    m_ptr = mmap(0, SHARED_MEMORY_SIZE, PROT_READ, MAP_SHARED, m_shm_fd, 0);
+    m_ptr = mmap(0, SHARED_MEMORY_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, m_shm_fd, 0);
     if (m_ptr == MAP_FAILED)
     {
         std::cerr << "SharedMemoryReceiver::init mmap failed\n";
