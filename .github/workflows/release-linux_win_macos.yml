@@ -1,9 +1,17 @@
 name: Release build Linux & Windows & MacOS
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the release (optional, overrides selected branch/tag)'
+        required: false
 
 permissions:
+  contents: write
   issues: write
   pull-requests: write
   checks: write
@@ -126,3 +134,49 @@ jobs:
       with:
         name: macos_release
         path: silber/build/macos_release
+
+  create-release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Download Linux Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux_release
+          path: linux_release
+
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows_release
+          path: windows_release
+
+      - name: Download MacOS Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos_release
+          path: macos_release
+
+      - name: Package Artifacts into Zips
+        run: |
+          zip -r silber-linux.zip linux_release
+          zip -r silber-windows.zip windows_release
+          zip -r silber-macos.zip macos_release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            silber-linux.zip
+            silber-windows.zip
+            silber-macos.zip
+          name: Release ${{ github.event.inputs.tag_name || github.ref_name }}
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
