@@ -1,4 +1,46 @@
 #include "ClientProcCommunicator.h"
+#include <iostream>
+
+#ifndef _WIN32
+#include <unistd.h>
+#include <signal.h>
+#include <sys/types.h>
+
+static bool is_process_alive(uint32_t pid)
+{
+    if (pid == 0) return false;
+    return (kill(pid, 0) == 0 || errno != ESRCH);
+}
+
+static uint32_t get_current_pid()
+{
+    return static_cast<uint32_t>(getpid());
+}
+#else
+#include <windows.h>
+
+static bool is_process_alive(uint32_t pid)
+{
+    if (pid == 0) return false;
+    HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (process)
+    {
+        DWORD exitCode;
+        if (GetExitCodeProcess(process, &exitCode))
+        {
+            CloseHandle(process);
+            return exitCode == STILL_ACTIVE;
+        }
+        CloseHandle(process);
+    }
+    return false;
+}
+
+static uint32_t get_current_pid()
+{
+    return static_cast<uint32_t>(GetCurrentProcessId());
+}
+#endif
 
 ClientProcCommunicator::ClientProcCommunicator(
     const std::string &shMemName) : ProcCommunicator(shMemName)
@@ -14,7 +56,7 @@ ClientProcCommunicator::ClientProcCommunicator(
     m_slave_ready = sem_open(m_slave_ready_s.c_str(), O_CREAT, 0666, N_SEM_ON);
 
     if (m_master_received == SEM_FAILED || m_slave_received == SEM_FAILED ||
-        m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED || m_slave_ready == SEM_FAILED)
+        m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED)
     {
         std::cerr << "ProcCommunicator sem_open failure.\n";
         exit(1);
@@ -35,4 +77,39 @@ ClientProcCommunicator::ClientProcCommunicator(
         exit(1);
     }
 #endif
+
+    // Dynamic slot allocation
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+    uint32_t my_pid = get_current_pid();
+    m_slot_index = -1;
+
+    for (size_t i = 0; i < MAX_CLIENTS_COUNT; ++i)
+    {
+        uint32_t expected_pid = registry->slot_pids[i].load();
+        if (expected_pid == 0 || !is_process_alive(expected_pid))
+        {
+            if (registry->slot_pids[i].compare_exchange_strong(expected_pid, my_pid))
+            {
+                m_slot_index = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+
+    if (m_slot_index == -1)
+    {
+        std::cerr << "ClientProcCommunicator warning: all communication slots are occupied.\n";
+    }
+}
+
+ClientProcCommunicator::~ClientProcCommunicator()
+{
+    if (m_slot_index != -1 && m_sender)
+    {
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        if (registry)
+        {
+            registry->slot_pids[m_slot_index].store(0);
+        }
+    }
 }

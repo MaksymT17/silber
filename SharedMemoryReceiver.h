@@ -10,6 +10,7 @@ public:
     void init();
     void finish();
     Message *receiveMessage(const size_t offset = 0);
+    void *getPtr() const { return m_ptr; }
 
 private:
     HANDLE m_shm_fd;

@@ -82,21 +82,30 @@ ServerProcCommunicator::~ServerProcCommunicator()
 
 void ServerProcCommunicator::send(const Message *msg)
 {
-    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
+
+    m_sender->sendMessage(msg, CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
     sem_post(m_slave_sent);
 }
 
 Message *ServerProcCommunicator::receive()
 {
     sem_wait(m_master_sent);
-    Message *response = m_receiver->receiveMessage();
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
+
+    Message *response = m_receiver->receiveMessage(CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
     return response;
 }
 
 #else
 void ServerProcCommunicator::send(const Message *msg)
 {
-    m_sender->sendMessage(msg, msg->id * CLIENT_MEM_SIZE);
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
+
+    m_sender->sendMessage(msg, CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
     ReleaseSemaphore(m_slave_sent, 1, NULL);
 }
 
@@ -109,7 +118,10 @@ Message *ServerProcCommunicator::receive()
         return nullptr;
     }
 
-    Message *response = m_receiver->receiveMessage();
+    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
+    int32_t active_slot = registry->active_slot.load();
+
+    Message *response = m_receiver->receiveMessage(CONTROL_PAGE_SIZE + active_slot * CLIENT_MEM_SIZE);
     return response;
 }
 

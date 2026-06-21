@@ -7,6 +7,7 @@
 #include <cassert>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <csignal>
 
@@ -247,6 +248,15 @@ void test4_large_id() {
 }
 
 int main() {
+    // Clean up any stale shared memory and semaphores from previous runs
+    shm_unlink("/shm_test_suite_master");
+    shm_unlink("/shm_test_suite_slave");
+    sem_unlink("/shm_test_suite_m_rsem");
+    sem_unlink("/shm_test_suite_s_rsem");
+    sem_unlink("/shm_test_suite_m_sent");
+    sem_unlink("/shm_test_suite_s_sent");
+    sem_unlink("/shm_test_suite_s_ready");
+
     // Watchdog signal handler to catch deadlock hangs
     signal(SIGALRM, [](int sig) {
         std::cerr << "\n!!! WATCHDOG TIMEOUT: Test deadlocked or took too long !!!" << std::endl;

@@ -10,8 +10,9 @@ class ClientProcCommunicator : public ProcCommunicator
 {
 public:
     ClientProcCommunicator(const std::string &shMemName);
+    virtual ~ClientProcCommunicator();
 
-    virtual ~ClientProcCommunicator() = default;
+    bool isValid() const { return m_slot_index != -1; }
 
 #ifndef _WIN32
     // Helper for native timed wait on POSIX
@@ -61,16 +62,25 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse)
     {
+        if (m_slot_index == -1)
+        {
+            return false;
+        }
+
         sem_wait(m_slave_ready);
         
         // Drain any stale response signals
         while (sem_trywait(m_slave_sent) == 0) {}
 
-        m_sender->sendMessage(request);
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         sem_post(m_master_sent);
         sem_wait(m_slave_sent);
 
-        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
         {
@@ -86,6 +96,11 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse, size_t timeout_ms)
     {
+        if (m_slot_index == -1)
+        {
+            return false;
+        }
+
         auto start = std::chrono::steady_clock::now();
         if (!sem_wait_timeout(m_slave_ready, timeout_ms))
         {
@@ -104,7 +119,11 @@ public:
         // Drain any stale response signals
         while (sem_trywait(m_slave_sent) == 0) {}
 
-        m_sender->sendMessage(request);
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         sem_post(m_master_sent);
 
         if (!sem_wait_timeout(m_slave_sent, remaining))
@@ -113,7 +132,7 @@ public:
             return false;
         }
 
-        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
         {
@@ -130,16 +149,25 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse)
     {
+        if (m_slot_index == -1)
+        {
+            return false;
+        }
+
         WaitForSingleObject(m_slave_ready, INFINITE);
 
         // Drain stale signals
         while (WaitForSingleObject(m_slave_sent, 0) == WAIT_OBJECT_0) {}
 
-        m_sender->sendMessage(request);
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         ReleaseSemaphore(m_master_sent, 1, NULL);
         WaitForSingleObject(m_slave_sent, INFINITE);
 
-        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
         {
@@ -154,6 +182,11 @@ public:
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse, size_t timeout_ms)
     {
+        if (m_slot_index == -1)
+        {
+            return false;
+        }
+
         auto start = std::chrono::steady_clock::now();
         DWORD result = WaitForSingleObject(m_slave_ready, (DWORD)timeout_ms);
         if (result != WAIT_OBJECT_0)
@@ -173,7 +206,11 @@ public:
         // Drain stale signals
         while (WaitForSingleObject(m_slave_sent, 0) == WAIT_OBJECT_0) {}
 
-        m_sender->sendMessage(request);
+        // Set active slot in the control registry
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        registry->active_slot.store(m_slot_index);
+
+        m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         ReleaseSemaphore(m_master_sent, 1, NULL);
 
         result = WaitForSingleObject(m_slave_sent, (DWORD)remaining);
@@ -183,7 +220,7 @@ public:
             return false;
         }
 
-        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(request->id * CLIENT_MEM_SIZE));
+        const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
         if (repsonsePtr)
         {
@@ -195,4 +232,7 @@ public:
         return false;
     }
 #endif
+
+private:
+    int m_slot_index{-1};
 };
