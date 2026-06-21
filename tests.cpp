@@ -377,8 +377,8 @@ void test5_error_handling() {
     // Suppress logging during this test as these errors are expected
     setSilberErrorCallback(nullptr);
 
-    // Initialize with a name that is too long to trigger ENAMETOOLONG in shm_open
-    std::string long_name(2000, 'A');
+    // Initialize with a name that is too long to trigger errors in shm_open / CreateFileMapping
+    std::string long_name(35000, 'A');
     ClientProcCommunicator client(long_name);
     ASSERT_TRUE(!client.isValid());
 
