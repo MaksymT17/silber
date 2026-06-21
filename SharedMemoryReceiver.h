@@ -18,6 +18,7 @@ class SharedMemoryReceiver : public ISharedMemoryReceiver
 {
 public:
     SharedMemoryReceiver(const char *shMemName);
+    ~SharedMemoryReceiver() override;
     void init() override;
     void finish() override;
     Message *receiveMessage(const size_t offset = 0) override;
@@ -31,8 +32,11 @@ public:
     }
 
 private:
-    HANDLE m_shm_fd;
-
-    void *m_ptr;
+#ifndef _WIN32
+    HANDLE m_shm_fd{-1};
+#else
+    HANDLE m_shm_fd{NULL};
+#endif
+    void *m_ptr{nullptr};
     std::string m_name;
 };

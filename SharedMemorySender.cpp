@@ -15,6 +15,11 @@ SharedMemorySender::SharedMemorySender(const char *shMemName) : m_name(shMemName
 {
     init();
 }
+
+SharedMemorySender::~SharedMemorySender()
+{
+    finish();
+}
 #ifndef _WIN32
 void SharedMemorySender::init()
 {
@@ -59,18 +64,21 @@ void SharedMemorySender::init()
 
 void SharedMemorySender::finish()
 {
-    if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+    if (m_ptr && m_ptr != (void*)-1 && m_ptr != MAP_FAILED)
     {
-        std::cerr << "munmap failed" << std::endl;
+        if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+        {
+            std::cerr << "munmap failed" << std::endl;
+        }
+        m_ptr = nullptr;
     }
-    if (close(m_shm_fd) == -1)
+    if (m_shm_fd != -1)
     {
-        std::cerr << "close failed" << std::endl;
-    }
-
-    if (shm_unlink(m_name.c_str()) == -1)
-    {
-        std::cerr << "shm_unlink failed" << std::endl;
+        if (close(m_shm_fd) == -1)
+        {
+            std::cerr << "close failed" << std::endl;
+        }
+        m_shm_fd = -1;
     }
 }
 
@@ -101,8 +109,16 @@ void SharedMemorySender::init()
 
 void SharedMemorySender::finish()
 {
-    UnmapViewOfFile(m_ptr);
-    CloseHandle(m_shm_fd);
+    if (m_ptr)
+    {
+        UnmapViewOfFile(m_ptr);
+        m_ptr = nullptr;
+    }
+    if (m_shm_fd != NULL)
+    {
+        CloseHandle(m_shm_fd);
+        m_shm_fd = NULL;
+    }
 }
 
 void SharedMemorySender::sendMessage(const Message *msg, const size_t offset)

@@ -1,5 +1,10 @@
 #include "ServerProcCommunicator.h"
 
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
 ServerProcCommunicator::ServerProcCommunicator(const std::string &shMemName)
     : ServerProcCommunicator(
           shMemName,
@@ -77,6 +82,9 @@ ServerProcCommunicator::~ServerProcCommunicator()
     {
         std::cerr <<"Failed to unlink m_slave_ready semaphore\n";
     }
+
+    shm_unlink(m_master_mem_name.c_str());
+    shm_unlink(m_slave_mem_name.c_str());
 #endif
 }
 #ifndef _WIN32

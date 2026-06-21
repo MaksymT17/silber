@@ -17,6 +17,11 @@ SharedMemoryReceiver::SharedMemoryReceiver(const char *shMemName) : m_name(shMem
 {
     init();
 }
+
+SharedMemoryReceiver::~SharedMemoryReceiver()
+{
+    finish();
+}
 #ifndef _WIN32
 void SharedMemoryReceiver::init()
 {
@@ -61,13 +66,21 @@ void SharedMemoryReceiver::init()
 }
 void SharedMemoryReceiver::finish()
 {
-    if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+    if (m_ptr && m_ptr != (void*)-1 && m_ptr != MAP_FAILED)
     {
-        std::cerr << "munmap failed" << std::endl;
+        if (munmap(m_ptr, SHARED_MEMORY_SIZE) == -1)
+        {
+            std::cerr << "munmap failed" << std::endl;
+        }
+        m_ptr = nullptr;
     }
-    if (close(m_shm_fd) == -1)
+    if (m_shm_fd != -1)
     {
-        std::cerr << "close failed" << std::endl;
+        if (close(m_shm_fd) == -1)
+        {
+            std::cerr << "close failed" << std::endl;
+        }
+        m_shm_fd = -1;
     }
 }
 #else
@@ -115,8 +128,16 @@ void SharedMemoryReceiver::init()
 
 void SharedMemoryReceiver::finish()
 {
-    UnmapViewOfFile(m_ptr);
-    CloseHandle(m_shm_fd);
+    if (m_ptr)
+    {
+        UnmapViewOfFile(m_ptr);
+        m_ptr = nullptr;
+    }
+    if (m_shm_fd != NULL)
+    {
+        CloseHandle(m_shm_fd);
+        m_shm_fd = NULL;
+    }
 }
 #endif
 

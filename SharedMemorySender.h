@@ -25,6 +25,7 @@ class SharedMemorySender : public ISharedMemorySender
 {
 public:
     SharedMemorySender(const char *shMemName);
+    ~SharedMemorySender() override;
     void init() override;
     void finish() override;
     void sendMessage(const Message *msg, const size_t offset=0) override;
@@ -38,7 +39,11 @@ public:
     }
 
 private:
-    HANDLE m_shm_fd;
-    void *m_ptr;
+#ifndef _WIN32
+    HANDLE m_shm_fd{-1};
+#else
+    HANDLE m_shm_fd{NULL};
+#endif
+    void *m_ptr{nullptr};
     std::string m_name;
 };
