@@ -11,6 +11,26 @@
 #include <unistd.h>
 #include <csignal>
 
+#ifdef __APPLE__
+#include <mach/thread_act.h>
+#include <mach/thread_policy.h>
+#include <mach/mach_init.h>
+inline void pin_to_core(int core_id) {
+    thread_affinity_policy_data_t policy = { core_id };
+    thread_policy_set(mach_thread_self(), THREAD_AFFINITY_POLICY, (thread_policy_t)&policy, THREAD_AFFINITY_POLICY_COUNT);
+}
+#elif !defined(_WIN32)
+#include <pthread.h>
+inline void pin_to_core(int core_id) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(core_id, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
+#else
+inline void pin_to_core(int core_id) {}
+#endif
+
 static const std::string shared_mem_name{"/shm_test_suite"};
 
 #define ASSERT_TRUE(x) do { \
@@ -275,6 +295,7 @@ void test5_error_handling() {
 
 // TEST 6: Performance Benchmark
 void run_benchmark_server() {
+    pin_to_core(1);
     ServerProcCommunicator server(shared_mem_name);
     for (int i = 0; i < 100000; ++i) {
         Message *req = server.receive();
@@ -287,6 +308,7 @@ void run_benchmark_server() {
 }
 
 void run_benchmark_client() {
+    pin_to_core(2);
     ClientProcCommunicator client(shared_mem_name);
     Message req(1, MessageType::HANDSHAKE);
     const Message *resp = nullptr;

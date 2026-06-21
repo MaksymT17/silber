@@ -106,7 +106,23 @@ void ServerProcCommunicator::send(const Message *msg)
 Message *ServerProcCommunicator::receive()
 {
     if (!isValid()) return nullptr;
-    sem_wait(m_master_sent);
+    
+    // Adaptive spin wait
+    bool acquired = false;
+    for (int spin = 0; spin < 4000; ++spin)
+    {
+        if (sem_trywait(m_master_sent) == 0)
+        {
+            acquired = true;
+            break;
+        }
+        cpu_yield();
+    }
+    if (!acquired)
+    {
+        sem_wait(m_master_sent);
+    }
+
     ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
     int32_t active_slot = registry->active_slot.load();
 
@@ -128,11 +144,26 @@ void ServerProcCommunicator::send(const Message *msg)
 Message *ServerProcCommunicator::receive()
 {
     if (!isValid()) return nullptr;
-    DWORD waitResult = WaitForSingleObject(m_master_sent, INFINITE);
-    if (waitResult != WAIT_OBJECT_0)
+    
+    // Adaptive spin wait
+    bool acquired = false;
+    for (int spin = 0; spin < 4000; ++spin)
     {
-        std::cerr << "ProcCommunicator::receive WaitForSingleObject FAIL\n";
-        return nullptr;
+        if (WaitForSingleObject(m_master_sent, 0) == WAIT_OBJECT_0)
+        {
+            acquired = true;
+            break;
+        }
+        cpu_yield();
+    }
+    if (!acquired)
+    {
+        DWORD waitResult = WaitForSingleObject(m_master_sent, INFINITE);
+        if (waitResult != WAIT_OBJECT_0)
+        {
+            std::cerr << "ProcCommunicator::receive WaitForSingleObject FAIL\n";
+            return nullptr;
+        }
     }
 
     ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());

@@ -59,6 +59,32 @@ public:
 #endif
     }
 
+    void sem_wait_adaptive(N_SEM sem)
+    {
+        for (int spin = 0; spin < 4000; ++spin)
+        {
+            if (sem_trywait(sem) == 0)
+            {
+                return;
+            }
+            cpu_yield();
+        }
+        sem_wait(sem);
+    }
+
+    bool sem_wait_timeout_adaptive(N_SEM sem, size_t timeout_ms)
+    {
+        for (int spin = 0; spin < 2000; ++spin)
+        {
+            if (sem_trywait(sem) == 0)
+            {
+                return true;
+            }
+            cpu_yield();
+        }
+        return sem_wait_timeout(sem, timeout_ms);
+    }
+
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse)
     {
@@ -67,7 +93,7 @@ public:
             return false;
         }
 
-        sem_wait(m_slave_ready);
+        sem_wait_adaptive(m_slave_ready);
         
         // Drain any stale response signals
         while (sem_trywait(m_slave_sent) == 0) {}
@@ -78,7 +104,7 @@ public:
 
         m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         sem_post(m_master_sent);
-        sem_wait(m_slave_sent);
+        sem_wait_adaptive(m_slave_sent);
 
         const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
@@ -102,7 +128,7 @@ public:
         }
 
         auto start = std::chrono::steady_clock::now();
-        if (!sem_wait_timeout(m_slave_ready, timeout_ms))
+        if (!sem_wait_timeout_adaptive(m_slave_ready, timeout_ms))
         {
             return false;
         }
@@ -126,7 +152,7 @@ public:
         m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         sem_post(m_master_sent);
 
-        if (!sem_wait_timeout(m_slave_sent, remaining))
+        if (!sem_wait_timeout_adaptive(m_slave_sent, remaining))
         {
             sem_post(m_slave_ready);
             return false;
@@ -146,6 +172,32 @@ public:
     }
 
 #else
+    void sem_wait_adaptive(N_SEM sem)
+    {
+        for (int spin = 0; spin < 4000; ++spin)
+        {
+            if (WaitForSingleObject(sem, 0) == WAIT_OBJECT_0)
+            {
+                return;
+            }
+            cpu_yield();
+        }
+        WaitForSingleObject(sem, INFINITE);
+    }
+
+    bool sem_wait_timeout_adaptive(N_SEM sem, size_t timeout_ms)
+    {
+        for (int spin = 0; spin < 2000; ++spin)
+        {
+            if (WaitForSingleObject(sem, 0) == WAIT_OBJECT_0)
+            {
+                return true;
+            }
+            cpu_yield();
+        }
+        return WaitForSingleObject(sem, (DWORD)timeout_ms) == WAIT_OBJECT_0;
+    }
+
     template <typename Response>
     bool sendRequestGetResponse(const Message *request, const Response **reponse)
     {
@@ -154,7 +206,7 @@ public:
             return false;
         }
 
-        WaitForSingleObject(m_slave_ready, INFINITE);
+        sem_wait_adaptive(m_slave_ready);
 
         // Drain stale signals
         while (WaitForSingleObject(m_slave_sent, 0) == WAIT_OBJECT_0) {}
@@ -165,7 +217,7 @@ public:
 
         m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         ReleaseSemaphore(m_master_sent, 1, NULL);
-        WaitForSingleObject(m_slave_sent, INFINITE);
+        sem_wait_adaptive(m_slave_sent);
 
         const Response *repsonsePtr = static_cast<const Response *>(m_receiver->receiveMessage(CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE));
 
@@ -188,8 +240,7 @@ public:
         }
 
         auto start = std::chrono::steady_clock::now();
-        DWORD result = WaitForSingleObject(m_slave_ready, (DWORD)timeout_ms);
-        if (result != WAIT_OBJECT_0)
+        if (!sem_wait_timeout_adaptive(m_slave_ready, timeout_ms))
         {
             return false;
         }
@@ -213,8 +264,7 @@ public:
         m_sender->sendMessage(request, CONTROL_PAGE_SIZE + m_slot_index * CLIENT_MEM_SIZE);
         ReleaseSemaphore(m_master_sent, 1, NULL);
 
-        result = WaitForSingleObject(m_slave_sent, (DWORD)remaining);
-        if (result != WAIT_OBJECT_0)
+        if (!sem_wait_timeout_adaptive(m_slave_sent, remaining))
         {
             ReleaseSemaphore(m_slave_ready, 1, NULL);
             return false;
