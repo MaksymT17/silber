@@ -30,13 +30,15 @@ void SharedMemoryReceiver::init()
             {
                 std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
                 perror("shm_open failed");
-                exit(EXIT_FAILURE);
+                m_ptr = nullptr;
+                return;
             }
         }
         else
         {
             std::cerr << "SharedMemoryReceiver::init shm_open failed\n";
-            exit(EXIT_FAILURE);
+            m_ptr = nullptr;
+            return;
         }
     }
     else
@@ -45,7 +47,8 @@ void SharedMemoryReceiver::init()
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
             std::cerr << "SharedMemoryReceiver::init ftruncate failed\n";
-            exit(EXIT_FAILURE);
+            m_ptr = nullptr;
+            return;
         }
     }
 
@@ -53,7 +56,7 @@ void SharedMemoryReceiver::init()
     if (m_ptr == MAP_FAILED)
     {
         std::cerr << "SharedMemoryReceiver::init mmap failed\n";
-        return;
+        m_ptr = nullptr;
     }
 }
 void SharedMemoryReceiver::finish()

@@ -26,7 +26,6 @@ ServerProcCommunicator::ServerProcCommunicator(
         m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED)
     {
         perror("sem_open failure");
-        exit(EXIT_FAILURE);
     }
 
 #else
@@ -43,11 +42,25 @@ ServerProcCommunicator::ServerProcCommunicator(
     if (!m_master_received || !m_slave_received || !m_master_sent || !m_slave_sent || !m_slave_ready)
     {
         std::cerr << "CreateSemaphore failure, error: " << GetLastError() << '\n';
-        exit(EXIT_FAILURE);
     }
 
 #endif
 
+}
+
+bool ServerProcCommunicator::isValid() const
+{
+    if (!m_sender || !m_receiver || !m_sender->isValid() || !m_receiver->isValid())
+    {
+        return false;
+    }
+#ifndef _WIN32
+    return m_master_received != SEM_FAILED && m_slave_received != SEM_FAILED &&
+           m_master_sent != SEM_FAILED && m_slave_sent != SEM_FAILED && m_slave_ready != SEM_FAILED;
+#else
+    return m_master_received != NULL && m_slave_received != NULL &&
+           m_master_sent != NULL && m_slave_sent != NULL && m_slave_ready != NULL;
+#endif
 }
 ServerProcCommunicator::~ServerProcCommunicator()
 {
@@ -82,6 +95,7 @@ ServerProcCommunicator::~ServerProcCommunicator()
 
 void ServerProcCommunicator::send(const Message *msg)
 {
+    if (!isValid()) return;
     ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
     int32_t active_slot = registry->active_slot.load();
 
@@ -91,6 +105,7 @@ void ServerProcCommunicator::send(const Message *msg)
 
 Message *ServerProcCommunicator::receive()
 {
+    if (!isValid()) return nullptr;
     sem_wait(m_master_sent);
     ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
     int32_t active_slot = registry->active_slot.load();
@@ -102,6 +117,7 @@ Message *ServerProcCommunicator::receive()
 #else
 void ServerProcCommunicator::send(const Message *msg)
 {
+    if (!isValid()) return;
     ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_receiver->getPtr());
     int32_t active_slot = registry->active_slot.load();
 
@@ -111,6 +127,7 @@ void ServerProcCommunicator::send(const Message *msg)
 
 Message *ServerProcCommunicator::receive()
 {
+    if (!isValid()) return nullptr;
     DWORD waitResult = WaitForSingleObject(m_master_sent, INFINITE);
     if (waitResult != WAIT_OBJECT_0)
     {

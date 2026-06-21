@@ -5,6 +5,7 @@ project (silber)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_EXTENSIONS OFF)  # Turn off compiler-specific extensions
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
 
 ADD_LIBRARY(silber-1.2 STATIC
     SharedMemoryReceiver.cpp

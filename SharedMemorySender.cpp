@@ -27,13 +27,15 @@ void SharedMemorySender::init()
             if (m_shm_fd == -1)
             {
                 std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
-                exit(EXIT_FAILURE);
+                m_ptr = nullptr;
+                return;
             }
         }
         else
         {
             std::cerr << "SharedMemorySender::init shm_open failed" << std::endl;
-            exit(EXIT_FAILURE);
+            m_ptr = nullptr;
+            return;
         }
     }
     else
@@ -41,7 +43,8 @@ void SharedMemorySender::init()
         if (ftruncate(m_shm_fd, SHARED_MEMORY_SIZE) == -1)
         {
             std::cerr << "SharedMemorySender::init ftruncate failed" << std::endl;
-            exit(EXIT_FAILURE);
+            m_ptr = nullptr;
+            return;
         }
     }
 
@@ -50,7 +53,7 @@ void SharedMemorySender::init()
     if (m_ptr == MAP_FAILED)
     {
         std::cerr << "mmap failed" << std::endl;
-        throw std::exception();
+        m_ptr = nullptr;
     }
 }
 

@@ -12,7 +12,7 @@ public:
     ClientProcCommunicator(const std::string &shMemName);
     virtual ~ClientProcCommunicator();
 
-    bool isValid() const { return m_slot_index != -1; }
+    bool isValid() const;
 
 #ifndef _WIN32
     // Helper for native timed wait on POSIX

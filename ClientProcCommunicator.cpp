@@ -59,7 +59,6 @@ ClientProcCommunicator::ClientProcCommunicator(
         m_master_sent == SEM_FAILED || m_slave_sent == SEM_FAILED || m_slave_ready == SEM_FAILED)
     {
         std::cerr << "ProcCommunicator sem_open failure.\n";
-        exit(1);
     }
 #else
     std::wstring wshMemName(shMemName.begin(), shMemName.end());
@@ -74,37 +73,60 @@ ClientProcCommunicator::ClientProcCommunicator(
         m_master_sent == NULL || m_slave_sent == NULL || m_slave_ready == NULL)
     {
         std::cerr << "ProcCommunicator sem_open failure.\n";
-        exit(1);
     }
 #endif
 
     // Dynamic slot allocation
-    ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
-    uint32_t my_pid = get_current_pid();
     m_slot_index = -1;
-
-    for (size_t i = 0; i < MAX_CLIENTS_COUNT; ++i)
+    if (m_sender && m_sender->isValid())
     {
-        uint32_t expected_pid = registry->slot_pids[i].load();
-        if (expected_pid == 0 || !is_process_alive(expected_pid))
+        ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
+        if (registry)
         {
-            if (registry->slot_pids[i].compare_exchange_strong(expected_pid, my_pid))
+            uint32_t my_pid = get_current_pid();
+            for (size_t i = 0; i < MAX_CLIENTS_COUNT; ++i)
             {
-                m_slot_index = static_cast<int>(i);
-                break;
+                uint32_t expected_pid = registry->slot_pids[i].load();
+                if (expected_pid == 0 || !is_process_alive(expected_pid))
+                {
+                    if (registry->slot_pids[i].compare_exchange_strong(expected_pid, my_pid))
+                    {
+                        m_slot_index = static_cast<int>(i);
+                        break;
+                    }
+                }
             }
         }
     }
 
     if (m_slot_index == -1)
     {
-        std::cerr << "ClientProcCommunicator warning: all communication slots are occupied.\n";
+        std::cerr << "ClientProcCommunicator warning: all communication slots are occupied or initialization failed.\n";
     }
+}
+
+bool ClientProcCommunicator::isValid() const
+{
+    if (m_slot_index == -1)
+    {
+        return false;
+    }
+    if (!m_sender || !m_receiver || !m_sender->isValid() || !m_receiver->isValid())
+    {
+        return false;
+    }
+#ifndef _WIN32
+    return m_master_received != SEM_FAILED && m_slave_received != SEM_FAILED &&
+           m_master_sent != SEM_FAILED && m_slave_sent != SEM_FAILED && m_slave_ready != SEM_FAILED;
+#else
+    return m_master_received != NULL && m_slave_received != NULL &&
+           m_master_sent != NULL && m_slave_sent != NULL && m_slave_ready != NULL;
+#endif
 }
 
 ClientProcCommunicator::~ClientProcCommunicator()
 {
-    if (m_slot_index != -1 && m_sender)
+    if (m_slot_index != -1 && m_sender && m_sender->isValid())
     {
         ClientSlotRegistry *registry = static_cast<ClientSlotRegistry*>(m_sender->getPtr());
         if (registry)

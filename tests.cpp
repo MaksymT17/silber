@@ -247,6 +247,32 @@ void test4_large_id() {
     std::cout << "[Test 4] PASSED" << std::endl;
 }
 
+// TEST 5: Graceful Error Handling (No Exceptions / No Exit)
+void test5_error_handling() {
+    std::cout << "[Test 5] Starting Graceful Error Handling (No Exceptions / No Exit)..." << std::endl;
+    setup_watchdog(3);
+
+    // Initialize with a name that is too long to trigger ENAMETOOLONG in shm_open
+    std::string long_name(2000, 'A');
+    ClientProcCommunicator client(long_name);
+    ASSERT_TRUE(!client.isValid());
+
+    ServerProcCommunicator server(long_name);
+    ASSERT_TRUE(!server.isValid());
+
+    // Verify calls on invalid communicators do not crash/throw and return false/nullptr
+    const Message *resp = nullptr;
+    Message req(1, MessageType::HANDSHAKE);
+    bool ok = client.sendRequestGetResponse(&req, &resp);
+    ASSERT_TRUE(!ok);
+
+    Message *incoming = server.receive();
+    ASSERT_TRUE(incoming == nullptr);
+
+    cancel_watchdog();
+    std::cout << "[Test 5] PASSED" << std::endl;
+}
+
 int main() {
     // Clean up any stale shared memory and semaphores from previous runs
     shm_unlink("/shm_test_suite_master");
@@ -273,6 +299,9 @@ int main() {
     std::cout << "------------------------------------------" << std::endl;
     
     test4_large_id();
+    std::cout << "------------------------------------------" << std::endl;
+
+    test5_error_handling();
     std::cout << "------------------------------------------" << std::endl;
     
     std::cout << "ALL TESTS COMPLETED" << std::endl;

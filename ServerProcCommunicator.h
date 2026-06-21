@@ -10,4 +10,5 @@ public:
 
     void send(const Message *msg);
     Message *receive();
+    bool isValid() const;
 };
