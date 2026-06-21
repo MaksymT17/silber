@@ -12,7 +12,8 @@ ADD_LIBRARY(silber-1.2 STATIC
     SharedMemorySender.cpp
     ProcCommunicator.cpp
     ClientProcCommunicator.cpp
-    ServerProcCommunicator.cpp)
+    ServerProcCommunicator.cpp
+    SlotRegistry.cpp)
 
 # install library if it is needed by multiple targets
 install(TARGETS silber-1.2
